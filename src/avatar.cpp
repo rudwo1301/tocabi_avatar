@@ -3,6 +3,7 @@
 using namespace TOCABI;
 
 ofstream e_mpc_planner_data("/home/econom2-20/data/e_mpc_planner_data.txt");
+ofstream e_mpc_stabilizer_data("/home/econom2-20/data/e_mpc_stabilizer_data.txt");
 ofstream e_mpc_time_graph("/home/econom2-20/data/e_mpc_time_graph.txt");
 ofstream e_mpc_time_graph1("/home/econom2-20/data/e_mpc_time_graph1.txt");
 ofstream e_mpc_time_graph2("/home/econom2-20/data/e_mpc_time_graph2.txt");
@@ -8704,9 +8705,9 @@ MatrixXd AvatarController::getCMatrix(VectorXd q, VectorXd qdot)
 void AvatarController::computeThread3()
 {   
     std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
-    if(atb_mpc_planner_update_ == false)
+    if(atb_main_to_mpc_update_ == false)
     {
-        atb_mpc_planner_update_ = true;
+        atb_main_to_mpc_update_ = true;
 
         walking_tick_mpc_      = walking_tick_container_to_mpc_;
         current_step_num_mpc_  = current_step_num_container_to_mpc_;
@@ -8723,16 +8724,33 @@ void AvatarController::computeThread3()
         foot_step_support_frame_offset_mpc_ = foot_step_support_frame_offset_container_to_mpc_;
         foot_step_support_frame_mpc_ = foot_step_support_frame_container_to_mpc_;
 
-        atb_mpc_planner_update_ = false;
+        atb_main_to_mpc_update_ = false;
     }
 
-    thread3_hz_ = 40.0;
+    thread3_hz_ = 50.0;
 
-    IScomGenerator_LIPM_MPC(thread3_hz_, 1.0/thread3_hz_, 1.1, 2000/thread3_hz_);
+    IS_LIPM_CoM_Planner_MPC(thread3_hz_, 1.0/thread3_hz_, 1.2, 2000/thread3_hz_);
+
     std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
     e_mpc_time_graph << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()*1e-6 << ",";
 
-    dcmcontroller_LIPM_step_total(thread3_hz_, 1.025);
+    IS_LIPM_DCM_Stabilizer_MPC(thread3_hz_, 1.1);
+
+    if(atb_mpc_to_main_update_ == false)
+    {
+        atb_mpc_to_main_update_ = true;
+
+        MPC_Planner_state_from_mpc_ = MPC_Planner_state_mpc_;
+        MPC_Planner_u_from_mpc_ = MPC_Planner_u_mpc_;
+
+        MPC_Stabilizer_state_from_mpc_ = MPC_Stabilizer_state_mpc_;
+        MPC_Stabilizer_u_from_mpc_ = MPC_Stabilizer_u_mpc_;
+
+        current_step_num_container_from_mpc_ = current_step_num_mpc_;
+
+        atb_mpc_to_main_update_ = false;
+    }
+    mpc_update_ = true;
 
     econom2_thread_stepchange();
 
@@ -11585,7 +11603,8 @@ void AvatarController::getPelvTrajectory()
     double z_rot = foot_step_support_frame_(current_step_num_, 5);
 
     pelv_trajectory_support_.translation()(0) = pelv_support_current_.translation()(0) + 1.0 * (com_desired_(0) - com_support_current_(0));
-    pelv_trajectory_support_.translation()(1) = pelv_support_current_.translation()(1) + 1.0 * (com_desired_(1) - com_support_current_(1));
+    //pelv_trajectory_support_.translation()(1) = pelv_support_current_.translation()(1) + 1.0 * (com_desired_(1) - com_support_current_(1));
+    pelv_trajectory_support_.translation()(1) = pelv_support_current_.translation()(1) + 0.7 * (com_desired_(1) - com_support_current_(1));
     pelv_trajectory_support_.translation()(2) = pelv_support_current_.translation()(2) + 1.0 * (com_desired_(2) - com_support_current_(2));
 
     Eigen::Vector3d Trunk_trajectory_euler;
@@ -11700,9 +11719,9 @@ void AvatarController::getComTrajectory_mpc()
     com_start_tick_main_ = (bool)current_step_num_*t_start_;
 
     //send data to mpc
-    if(atb_main_update_ == false)
+    if(atb_main_to_mpc_update_ == false)
     {
-        atb_main_update_ = true;
+        atb_main_to_mpc_update_ = true;
         walking_tick_container_to_mpc_     = walking_tick_;
         com_start_tick_container_to_mpc_   = com_start_tick_main_;
         current_step_num_container_to_mpc_ = current_step_num_;
@@ -11719,59 +11738,46 @@ void AvatarController::getComTrajectory_mpc()
         foot_step_support_frame_offset_container_to_mpc_ = foot_step_support_frame_offset_;
         foot_step_support_frame_container_to_mpc_ = foot_step_support_frame_;
 
-        atb_main_update_ = false;
+        atb_main_to_mpc_update_ = false;
     }
 
     //receive data from mpc
     double thread_freq = thread3_hz_;
-    if(mpc_planner_update_ == true)
+    if(mpc_update_ == true)
     { 
-        if(atb_main_update_ == false)
+        if(atb_mpc_to_main_update_ == false)
         {
-            atb_main_update_ = true;
+            atb_mpc_to_main_update_ = true;
 
             MPC_Planner_u_main_(0) = (SUx_mpc_*MPC_Planner_u_from_mpc_)(0);
             MPC_Planner_u_main_(1) = (SUy_mpc_*MPC_Planner_u_from_mpc_)(0);
 
+            MPC_Stabilizer_u_main_(0) = (SUpx_stab_mpc_*MPC_Stabilizer_u_from_mpc_)(0);
+            MPC_Stabilizer_u_main_(1) = (SUpy_stab_mpc_*MPC_Stabilizer_u_from_mpc_)(0);
+
             if(current_step_num_ == current_step_num_container_from_mpc_)
             {
                 MPC_Planner_state_main_ = MPC_Planner_state_from_mpc_;
+
+                MPC_Stabilizer_state_main_ = MPC_Stabilizer_state_from_mpc_;
             }
             else
             {   
                 MPC_Planner_state_main_.segment(0,3) = A_mpc_*MPC_Planner_state_main_.segment(0,3) + B_mpc_*MPC_Planner_u_main_(0);
                 MPC_Planner_state_main_.segment(3,3) = A_mpc_*MPC_Planner_state_main_.segment(3,3) + B_mpc_*MPC_Planner_u_main_(1);
-            }
 
-            Planner_state_main_calc_ = MPC_Planner_state_main_;
-            atb_main_update_ = false;
-        }
-
-        mpc_planner_update_ = false;
-    }
-
-    if(mpc_stabilizer_update_ == true)
-    {
-        if(atb_mpc_stabilizer_update_ == false)
-        {
-            atb_mpc_stabilizer_update_ = true;
-
-            MPC_Stabilizer_u_main_(0) = (SUx_mpc_*MPC_Stabilizer_u_from_mpc_)(0);
-            MPC_Stabilizer_u_main_(1) = (SUy_mpc_*MPC_Stabilizer_u_from_mpc_)(0);
-
-            if(current_step_num_ == current_step_num_container_from_mpc_)
-            {
-                MPC_Stabilizer_state_main_ = MPC_Stabilizer_state_from_mpc_;
-            }
-            else
-            {
                 MPC_Stabilizer_state_main_.segment(0,3) = A_mpc_*MPC_Stabilizer_state_main_.segment(0,3) + B_mpc_*MPC_Stabilizer_u_main_(0);
                 MPC_Stabilizer_state_main_.segment(3,3) = A_mpc_*MPC_Stabilizer_state_main_.segment(3,3) + B_mpc_*MPC_Stabilizer_u_main_(1);
             }
+
+            Planner_state_main_calc_ = MPC_Planner_state_main_;
+
             Stabilizer_state_main_calc_ = MPC_Stabilizer_state_main_;
-            atb_mpc_stabilizer_update_ = false;
+
+            atb_mpc_to_main_update_ = false;
         }
-        mpc_stabilizer_update_ = false;
+
+        mpc_update_ = false;
     }
 
     Eigen::MatrixXd A_calc;      A_calc.resize(3,3);
@@ -11809,8 +11815,6 @@ void AvatarController::getComTrajectory_mpc()
     com_desired_(1) = Planner_state_main_calc_(3);
     com_desired_(2) = 0.72;
 
-    e_tmp_graph1 << Planner_state_main_calc_(3) << "," << MPC_Planner_state_main_(3) << "," << MPC_Planner_state_from_mpc_(3) << endl;
-
     dcm_desired_(0) = Planner_state_main_calc_(0) + Planner_state_main_calc_(1)/wn_;
     dcm_desired_(1) = Planner_state_main_calc_(3) + Planner_state_main_calc_(4)/wn_;
     dcm_desired_(2) = com_desired_(2);
@@ -11818,6 +11822,21 @@ void AvatarController::getComTrajectory_mpc()
     zmp_desired_(0) = Stabilizer_state_main_calc_(2);
     zmp_desired_(1) = Stabilizer_state_main_calc_(5);
     zmp_desired_(2) = 0.0;
+
+    e_tmp_graph1 << ref_zmp_(walking_tick_ - ((bool)current_step_num_)*t_start_, 0) << "," << ref_zmp_(walking_tick_ - ((bool)current_step_num_)*t_start_, 1) << "," << 0 << ","
+                 << Planner_state_main_calc_(0)       << "," << Planner_state_main_calc_(1)       << "," << Planner_state_main_calc_(2)       << ","
+                 << Planner_state_main_calc_(3)       << "," << Planner_state_main_calc_(4)       << "," << Planner_state_main_calc_(5)       << ","
+                 << MPC_Planner_state_main_(0)        << "," << MPC_Planner_state_main_(1)        << "," << MPC_Planner_state_main_(2)        << ","
+                 << MPC_Planner_state_main_(3)        << "," << MPC_Planner_state_main_(4)        << "," << MPC_Planner_state_main_(5)        << ","
+                 << MPC_Planner_state_from_mpc_(0)    << "," << MPC_Planner_state_from_mpc_(1)    << "," << MPC_Planner_state_from_mpc_(2)    << ","
+                 << MPC_Planner_state_from_mpc_(3)    << "," << MPC_Planner_state_from_mpc_(4)    << "," << MPC_Planner_state_from_mpc_(5)    << ","
+                 << Stabilizer_state_main_calc_(0)    << "," << Stabilizer_state_main_calc_(1)    << "," << Stabilizer_state_main_calc_(2)    << ","
+                 << Stabilizer_state_main_calc_(3)    << "," << Stabilizer_state_main_calc_(4)    << "," << Stabilizer_state_main_calc_(5)    << ","
+                 << MPC_Stabilizer_state_main_(0)     << "," << MPC_Stabilizer_state_main_(1)     << "," << MPC_Stabilizer_state_main_(2)     << ","
+                 << MPC_Stabilizer_state_main_(3)     << "," << MPC_Stabilizer_state_main_(4)     << "," << MPC_Stabilizer_state_main_(5)     << ","
+                 << MPC_Stabilizer_state_from_mpc_(0) << "," << MPC_Stabilizer_state_from_mpc_(1) << "," << MPC_Stabilizer_state_from_mpc_(2) << ","
+                 << MPC_Stabilizer_state_from_mpc_(3) << "," << MPC_Stabilizer_state_from_mpc_(4) << "," << MPC_Stabilizer_state_from_mpc_(5) << ","
+                 << endl;
 
     //step change
     if(walking_tick_ == t_start_ + t_total_ - 1 && current_step_num_ != total_step_num_ - 1)
@@ -11896,13 +11915,13 @@ void AvatarController::getComTrajectory_mpc()
         Stabilizer_state_main_calc_(3) = var_after_step_change(1);
 
         //com vel step change
-        var_before_step_change(0) = Stabilizer_state_main_calc_(2);
-        var_before_step_change(1) = Stabilizer_state_main_calc_(5);
+        var_before_step_change(0) = Stabilizer_state_main_calc_(1);
+        var_before_step_change(1) = Stabilizer_state_main_calc_(4);
         var_before_step_change(2) = 0.0;
         var_after_step_change = frame_rot_diff*(var_before_step_change - frame_pos_diff);
 
-        Stabilizer_state_main_calc_(2) = var_after_step_change(0);
-        Stabilizer_state_main_calc_(5) = var_after_step_change(1);
+        Stabilizer_state_main_calc_(1) = var_after_step_change(0);
+        Stabilizer_state_main_calc_(4) = var_after_step_change(1);
 
         //p pos step change
         var_before_step_change(0) = Stabilizer_state_main_calc_(2);
@@ -11912,10 +11931,37 @@ void AvatarController::getComTrajectory_mpc()
 
         Stabilizer_state_main_calc_(2) = var_after_step_change(0);
         Stabilizer_state_main_calc_(5) = var_after_step_change(1);
+
+        //com pos step change
+        var_before_step_change(0) = MPC_Stabilizer_state_main_(0);
+        var_before_step_change(1) = MPC_Stabilizer_state_main_(3);
+        var_before_step_change(2) = com_desired_(2);
+        var_after_step_change = frame_rot_diff*(var_before_step_change - frame_pos_diff);
+
+        MPC_Stabilizer_state_main_(0) = var_after_step_change(0);
+        MPC_Stabilizer_state_main_(3) = var_after_step_change(1);
+
+        //com vel step change
+        var_before_step_change(0) = MPC_Stabilizer_state_main_(1);
+        var_before_step_change(1) = MPC_Stabilizer_state_main_(4);
+        var_before_step_change(2) = 0.0;
+        var_after_step_change = frame_rot_diff*var_before_step_change;
+
+        MPC_Stabilizer_state_main_(1) = var_after_step_change(0);
+        MPC_Stabilizer_state_main_(4) = var_after_step_change(1);
+
+        //p pos step change
+        var_before_step_change(0) = MPC_Stabilizer_state_main_(2);
+        var_before_step_change(1) = MPC_Stabilizer_state_main_(5);
+        var_before_step_change(2) = com_desired_(2);
+        var_after_step_change = frame_rot_diff*(var_before_step_change - frame_pos_diff);
+
+        MPC_Stabilizer_state_main_(2) = var_after_step_change(0);
+        MPC_Stabilizer_state_main_(5) = var_after_step_change(1);
     }
 }    
 
-void AvatarController::IScomGenerator_LIPM_MPC(double mpc_freq, double dt_, double preview_time_, int MPC_synchro_hz_)
+void AvatarController::IS_LIPM_CoM_Planner_MPC(double mpc_freq, double dt_, double preview_time_, int MPC_synchro_hz_)
 {
     double wpx,  wpy;
     double wdpx, wdpy;
@@ -12026,25 +12072,25 @@ void AvatarController::IScomGenerator_LIPM_MPC(double mpc_freq, double dt_, doub
         Q_identity_calc.setIdentity(N_mpc, N_mpc);
 
         Qx_mpc_.setZero(N_mpc, N_mpc);
-        Qx_mpc_ = P_IS_mpc_.transpose()*wpx*Q_identity_calc*P_IS_mpc_ + wdpx*Q_identity_calc;
+        Qx_mpc_ = Ppu_mpc_.transpose()*wpx*Q_identity_calc*Ppu_mpc_ + wdpx*Q_identity_calc;
 
         Qy_mpc_.setZero(N_mpc, N_mpc);
-        Qy_mpc_ = P_IS_mpc_.transpose()*wpy*Q_identity_calc*P_IS_mpc_ + wdpy*Q_identity_calc;
+        Qy_mpc_ = Ppu_mpc_.transpose()*wpy*Q_identity_calc*Ppu_mpc_ + wdpy*Q_identity_calc;
 
         Q_mpc_.setZero(2*N_mpc,2*N_mpc);
         Q_mpc_ = SUx_mpc_.transpose()*Qx_mpc_*SUx_mpc_ + SUy_mpc_.transpose()*Qy_mpc_*SUy_mpc_;
 
         gx_mpc_.setZero(2*N_mpc,2*N_state);
-        gx_mpc_ = SUx_mpc_.transpose()*(P_IS_mpc_.transpose()*wpx*Q_identity_calc*p_IS_mpc_*Cp_mpc_)*ssx_mpc_;
+        gx_mpc_ = SUx_mpc_.transpose()*(Ppu_mpc_.transpose()*wpx*Q_identity_calc*Pps_mpc_)*ssx_mpc_;
 
         gy_mpc_.setZero(2*N_mpc,2*N_state);
-        gy_mpc_ = SUy_mpc_.transpose()*(P_IS_mpc_.transpose()*wpy*Q_identity_calc*p_IS_mpc_*Cp_mpc_)*ssy_mpc_;
+        gy_mpc_ = SUy_mpc_.transpose()*(Ppu_mpc_.transpose()*wpy*Q_identity_calc*Pps_mpc_)*ssy_mpc_;
         
         gx_ref_mpc_.setZero(2*N_mpc, N_mpc);
-        gx_ref_mpc_ = SUx_mpc_.transpose()*P_IS_mpc_.transpose()*wpx*Q_identity_calc;
+        gx_ref_mpc_ = SUx_mpc_.transpose()*Ppu_mpc_.transpose()*wpx*Q_identity_calc;
 
         gy_ref_mpc_.setZero(2*N_mpc, N_mpc);
-        gy_ref_mpc_ = SUy_mpc_.transpose()*P_IS_mpc_.transpose()*wpy*Q_identity_calc;
+        gy_ref_mpc_ = SUy_mpc_.transpose()*Ppu_mpc_.transpose()*wpy*Q_identity_calc;
 
         g_mpc_.setZero(2*N_mpc,1);
 
@@ -12081,6 +12127,12 @@ std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
 
     Eigen::VectorXd P_x_ref(N_mpc);
     Eigen::VectorXd P_y_ref(N_mpc);
+    Eigen::VectorXd P_y_ref_calc(N_mpc + N_step);
+    
+    for(int i = 0; i < N_mpc + N_step; i++)
+    {
+        P_y_ref_calc(i) = ref_zmp_mpc_(mpc_tick + MPC_synchro_hz_*(i+1), 1);
+    }
 
     for(int i = 0; i < N_mpc; i++)
     {
@@ -12089,8 +12141,8 @@ std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
 
         if(i < N_step)
         {
-            P_dot_ref_step_mpc_(i,0) = (ref_zmp_mpc_(mpc_tick + MPC_synchro_hz_*(i + N_mpc + 3),0) - ref_zmp_mpc_(mpc_tick + MPC_synchro_hz_*(i + N_mpc + 2),0))/dt_;
-            P_dot_ref_step_mpc_(i,1) = (ref_zmp_mpc_(mpc_tick + MPC_synchro_hz_*(i + N_mpc + 3),1) - ref_zmp_mpc_(mpc_tick + MPC_synchro_hz_*(i + N_mpc + 2),1))/dt_;
+            P_dot_ref_step_mpc_(i,0) = (ref_zmp_mpc_(mpc_tick + MPC_synchro_hz_*(i + N_mpc + 1),0) - ref_zmp_mpc_(mpc_tick + MPC_synchro_hz_*(i + N_mpc + 0),0))/dt_;
+            P_dot_ref_step_mpc_(i,1) = (ref_zmp_mpc_(mpc_tick + MPC_synchro_hz_*(i + N_mpc + 1),1) - ref_zmp_mpc_(mpc_tick + MPC_synchro_hz_*(i + N_mpc + 0),1))/dt_;
         }
 
         zmp_max_x_mpc_(i) = ref_zmp_wo_offset_mpc_(mpc_tick + MPC_synchro_hz_*(i+1), 0) + zmp_x_max;
@@ -12112,13 +12164,22 @@ e_mpc_time_graph1 << std::chrono::duration_cast<std::chrono::microseconds>(t3 - 
 //compute time high
 
     /////////////////////////////////////////////////////////////////
-    //////////////////////////CoM MPC Calc//////////////////////////.
+    //////////////////////////CoM MPC Calc///////////////////////////
     /////////////////////////////////////////////////////////////////
 
     QP_MPC_Planner_.EnableEqualityCondition(equality_condition_eps_);
     QP_MPC_Planner_.UpdateMinProblem(Q_mpc_, g_mpc_);
     QP_MPC_Planner_.DeleteSubjectToAx();
     QP_MPC_Planner_.DeleteSubjectToX();
+
+    //ZMP INEQ
+    const_A_mpc_. block(0*N_mpc, 0, 1*N_mpc, 2*N_mpc) = Ppu_mpc_*SUx_mpc_;
+    const_A_mpc_. block(1*N_mpc, 0, 1*N_mpc, 2*N_mpc) = Ppu_mpc_*SUy_mpc_;
+
+    const_ub_mpc_.block(0*N_mpc, 0, 1*N_mpc, 1)       = zmp_max_x_mpc_ - Pps_mpc_*ssx_mpc_*MPC_Planner_state_mpc_;
+    const_lb_mpc_.block(0*N_mpc, 0, 1*N_mpc, 1)       = zmp_min_x_mpc_ - Pps_mpc_*ssx_mpc_*MPC_Planner_state_mpc_;
+    const_ub_mpc_.block(1*N_mpc, 0, 1*N_mpc, 1)       = zmp_max_y_mpc_ - Pps_mpc_*ssy_mpc_*MPC_Planner_state_mpc_;
+    const_lb_mpc_.block(1*N_mpc, 0, 1*N_mpc, 1)       = zmp_min_y_mpc_ - Pps_mpc_*ssy_mpc_*MPC_Planner_state_mpc_;
 
     //IS EQ
     Eigen::MatrixXd Const_b_eq; Const_b_eq.setZero(2,1);
@@ -12127,6 +12188,9 @@ e_mpc_time_graph1 << std::chrono::duration_cast<std::chrono::microseconds>(t3 - 
                       -(pow(lambda_IS_calc, N_mpc)/(1 - pow(lambda_IS_calc, N_step))*(b_IS_step_mpc_.transpose()*P_dot_ref_step_mpc_.col(0))(0,0));
     Const_b_eq(1,0) = (wn_/(1 - lambda_IS_calc))*(MPC_Planner_state_mpc_(3) + MPC_Planner_state_mpc_(4)/wn_ - MPC_Planner_state_mpc_(5))
                       -(pow(lambda_IS_calc, N_mpc)/(1 + pow(lambda_IS_calc, N_step))*(b_IS_step_mpc_.transpose()*P_dot_ref_step_mpc_.col(1))(0,0));
+    
+    //P_dot_ref_step_mpc_.col(1).setZero();
+    
 
     const_A_mpc_.row(2*N_mpc + 0) = b_IS_mpc_.transpose()*SUx_mpc_;
     const_A_mpc_.row(2*N_mpc + 1) = b_IS_mpc_.transpose()*SUy_mpc_;
@@ -12147,6 +12211,45 @@ e_mpc_time_graph1 << std::chrono::duration_cast<std::chrono::microseconds>(t4 - 
         if((walking_tick_mpc_ - 1000/int(mpc_freq) + 1)%4000 == 0)
         { cout << "IS LIPM MPC Planner solved" << endl; }
 
+        Eigen::MatrixXd Ps_calc_temp;
+    Ps_calc_temp.resize(N_state, N_state);
+    Ps_calc_temp = A_mpc_;
+        
+    Eigen::MatrixXd Pps_calc_temp, Pcps_calc_temp;
+    Pps_calc_temp.setZero(N_mpc + N_step, N_state);
+    Pcps_calc_temp.setZero(N_mpc + N_step, N_state);
+        
+    Eigen::MatrixXd Pu_calc_temp;
+    Pu_calc_temp.setZero(N_state, N_mpc + N_step);   
+
+    Eigen::MatrixXd Ppu_calc_temp, Pcpu_calc_temp;
+    Ppu_calc_temp.setZero(N_mpc + N_step, N_mpc + N_step);
+    Pcpu_calc_temp.setZero(N_mpc + N_step, N_mpc + N_step);
+
+    for(int i = 0; i < N_mpc + N_step; i++)
+    {
+        Pps_calc_temp.row(i)  = Cp_mpc_*Ps_calc_temp;
+        Pcps_calc_temp.row(i) = Ccp_mpc_*Ps_calc_temp;
+        Ps_calc_temp          = Ps_calc_temp*A_mpc_;
+
+        Pu_calc_temp.col(i)   = B_mpc_;
+        Ppu_calc_temp.row(i)  = Cp_mpc_*Pu_calc_temp;
+        Pcpu_calc_temp.row(i) = Ccp_mpc_*Pu_calc_temp;
+        Pu_calc_temp = A_mpc_*Pu_calc_temp;
+    }
+
+    Eigen::VectorXd input_calc_temp;
+    input_calc_temp.setZero(N_mpc + N_step);
+    input_calc_temp << MPC_Planner_u_mpc_.segment(N_mpc, N_mpc), P_dot_ref_step_mpc_.col(1);
+
+    Eigen::MatrixXd prev_state_calc_temp;
+    prev_state_calc_temp.setZero(3, N_mpc + N_step);
+    prev_state_calc_temp.row(0).transpose() = Pcps_calc_temp*MPC_Planner_state_mpc_.segment(3, 3) + Pcpu_calc_temp*input_calc_temp;
+    prev_state_calc_temp.row(2).transpose() = Pps_calc_temp*MPC_Planner_state_mpc_.segment(3, 3) + Ppu_calc_temp*input_calc_temp;
+
+    e_tmp_graph18 << prev_state_calc_temp.row(0) << endl;
+    e_tmp_graph19 << prev_state_calc_temp.row(2) << endl;
+
         Planner_State_Prev_mpc_.row(0).transpose() = Pcps_mpc_*MPC_Planner_state_mpc_.segment(0, 3) + Pcpu_mpc_*SUx_mpc_*MPC_Planner_u_mpc_;
         Planner_State_Prev_mpc_.row(1).transpose() = Pcvs_mpc_*MPC_Planner_state_mpc_.segment(0, 3) + Pcvu_mpc_*SUx_mpc_*MPC_Planner_u_mpc_;
         Planner_State_Prev_mpc_.row(2).transpose() = Pps_mpc_ *MPC_Planner_state_mpc_.segment(0, 3) + Ppu_mpc_ *SUx_mpc_*MPC_Planner_u_mpc_;
@@ -12157,21 +12260,6 @@ e_mpc_time_graph1 << std::chrono::duration_cast<std::chrono::microseconds>(t4 - 
 
         MPC_Planner_state_mpc_.segment(0,3) = A_mpc_*MPC_Planner_state_mpc_.segment(0,3) + B_mpc_*(SUx_mpc_*MPC_Planner_u_mpc_)(0);
         MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*(SUy_mpc_*MPC_Planner_u_mpc_)(0);
-
-        //send mpc data
-        if(atb_mpc_planner_update_ == false)
-        {
-            atb_mpc_planner_update_ = true;
-
-            MPC_Planner_state_from_mpc_ = MPC_Planner_state_mpc_;
-
-            MPC_Planner_u_from_mpc_ = MPC_Planner_u_mpc_;
-
-            current_step_num_container_from_mpc_ = current_step_num_mpc_;
-
-            atb_mpc_planner_update_ = false;
-        }
-        mpc_planner_update_ = true;
     }
     else
     { 
@@ -12189,21 +12277,6 @@ e_mpc_time_graph1 << std::chrono::duration_cast<std::chrono::microseconds>(t4 - 
 
         MPC_Planner_state_mpc_.segment(0,3) = A_mpc_*MPC_Planner_state_mpc_.segment(0,3) + B_mpc_*(SUx_mpc_*MPC_Planner_u_mpc_)(0);
         MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*(SUy_mpc_*MPC_Planner_u_mpc_)(0);
-
-        //send mpc data
-        if(atb_mpc_planner_update_ == false)
-        {
-            atb_mpc_planner_update_ = true;
-
-            MPC_Planner_state_from_mpc_ = MPC_Planner_state_mpc_;
-
-            MPC_Planner_u_from_mpc_ = MPC_Planner_u_mpc_;
-
-            current_step_num_container_from_mpc_ = current_step_num_mpc_;
-
-            atb_mpc_planner_update_ = false;
-        }
-        mpc_planner_update_ = true;
     }
 
 std::chrono::steady_clock::time_point t5 = std::chrono::steady_clock::now();
@@ -12223,13 +12296,216 @@ e_mpc_time_graph1 << std::chrono::duration_cast<std::chrono::microseconds>(t6 - 
     e_tmp_graph4 << P_y_ref.transpose() << endl;
     e_tmp_graph5 << Planner_State_Prev_mpc_.row(3) << endl;
     e_tmp_graph6 << Planner_State_Prev_mpc_.row(5) << endl;
+    e_tmp_graph15 << zmp_max_y_mpc_.transpose() << endl;
+    e_tmp_graph16 << P_y_ref_calc.transpose() << endl;
+    e_tmp_graph17 << P_dot_ref_step_mpc_.col(1).transpose() << endl;
 std::chrono::steady_clock::time_point t7 = std::chrono::steady_clock::now();
 e_mpc_time_graph1 << std::chrono::duration_cast<std::chrono::microseconds>(t7 - t6).count()*1e-6 << endl;
 }
 
-void AvatarController::dcmcontroller_LIPM_step_total(double mpc_freq, double preview_time_)
+void AvatarController::IS_LIPM_DCM_Stabilizer_MPC(double mpc_freq, double preview_time_)
 {
+    double Q_dcm_x, Q_dcm_y, R_dcm_x, R_dcm_y, R_f_x, R_f_y, R_df_x, R_df_y, R_i_x, R_i_y, R_di_x, R_di_y;
+    Q_dcm_x = 1e-0, R_dcm_x = 1e-2, R_f_x = 1e-2, R_df_x = 1e+2, R_i_x, 1e-2, R_di_x = 1e+2;
+    Q_dcm_y = 1e-0, R_dcm_y = 1e-2, R_f_y = 1e-2, R_df_y = 1e+3, R_i_y, 1e-2, R_di_y = 1e+3;
 
+    static int Stab_MPC_first_loop = 0;
+    int mpc_tick = walking_tick_mpc_ - com_start_tick_mpc_;
+    double MPC_synchro_ha_ = 2000/mpc_freq;
+    int N_stab_mpc = preview_time_*mpc_freq;
+    int N_step = t_total_const_*mpc_freq;
+    int N_state = 3;
+    double dt_stab_mpc = 1/mpc_freq;
+
+    double lambda_IS_calc = exp(-wn_*dt_stab_mpc);
+    double step_enable_tick_main = 0.15*hz_;
+    double step_enable_tick_mpc  = 0.15*mpc_freq;
+    bool step_enable_bool = 0;
+    step_candidate_num_ = int(step_enable_tick_mpc + 1);
+
+    //int input_num = 2*N_stab_mpc + 4*step_candidate_num_;
+    //int const_num = 2*N_stab_mpc + 6*step_candidate_num_ + 2;
+
+    int input_num = 2*N_stab_mpc;
+    int const_num = 2*N_stab_mpc + 2;
+
+    if(Stab_MPC_first_loop == 0)
+    {
+        Cdp_mpc_.setZero(1, N_state);
+        Cdp_mpc_ << 1, b_fip_, 0;
+
+        Pdps_stab_mpc_.setZero(N_stab_mpc, N_state);
+        Pcps_stab_mpc_.setZero(N_stab_mpc, N_state);
+        Pcvs_stab_mpc_.setZero(N_stab_mpc, N_state);
+        Pps_stab_mpc_.setZero(N_stab_mpc, N_state);
+
+        Eigen::MatrixXd Ps_calc;
+        Ps_calc.setZero(N_state, N_state);
+        Ps_calc = A_mpc_;
+
+        Pdpu_stab_mpc_.setZero(N_stab_mpc, N_stab_mpc);
+        Pcpu_stab_mpc_.setZero(N_stab_mpc, N_stab_mpc);
+        Pcvu_stab_mpc_.setZero(N_stab_mpc, N_stab_mpc);
+        Ppu_stab_mpc_.setZero(N_stab_mpc, N_stab_mpc);
+
+        Eigen::MatrixXd Pu_calc;
+        Pu_calc.setZero(N_state, N_stab_mpc);
+
+        for(int i = 0; i < N_stab_mpc; i++)
+        {
+            Pdps_stab_mpc_.row(i) = Cdp_mpc_*Ps_calc;
+            Pcps_stab_mpc_.row(i) = Ccp_mpc_*Ps_calc;
+            Pcvs_stab_mpc_.row(i) = Ccv_mpc_*Ps_calc;
+            Pps_stab_mpc_ .row(i) = Cp_mpc_ *Ps_calc;
+            Ps_calc = Ps_calc*A_mpc_;
+
+            Pu_calc.col(i) = B_mpc_;
+            Pdpu_stab_mpc_.row(i) = Cdp_mpc_*Pu_calc;
+            Pcpu_stab_mpc_.row(i) = Ccp_mpc_*Pu_calc;
+            Pcvu_stab_mpc_.row(i) = Ccv_mpc_*Pu_calc;
+            Ppu_stab_mpc_ .row(i) = Cp_mpc_ *Pu_calc;
+            Pu_calc = A_mpc_*Pu_calc;
+        }
+
+        b_IS_stab_mpc_.setZero(N_stab_mpc, 1);
+        b_IS_stab_mpc_ = b_IS_mpc_.block(0, 0, N_stab_mpc, 1);
+
+        SUpx_stab_mpc_.setZero(N_stab_mpc, 2*N_stab_mpc); SUpx_stab_mpc_.block(0, 0*N_stab_mpc, 1*N_stab_mpc, 1*N_stab_mpc) = MatrixXd::Identity(1*N_stab_mpc, 1*N_stab_mpc);
+        SUpy_stab_mpc_.setZero(N_stab_mpc, 2*N_stab_mpc); SUpy_stab_mpc_.block(0, 1*N_stab_mpc, 1*N_stab_mpc, 1*N_stab_mpc) = MatrixXd::Identity(1*N_stab_mpc, 1*N_stab_mpc);
+
+        QP_MPC_Stabilizer_.InitializeProblemSize(input_num, const_num);
+
+        Eigen::MatrixXd Q_identity_N_calc;    Q_identity_N_calc.setIdentity(N_stab_mpc, N_stab_mpc);
+
+        Qpx_stab_mpc_ = Pdpu_stab_mpc_.transpose()*Q_dcm_x*Q_identity_N_calc*Pdpu_stab_mpc_ + R_dcm_x*Q_identity_N_calc;
+        Qpy_stab_mpc_ = Pdpu_stab_mpc_.transpose()*Q_dcm_y*Q_identity_N_calc*Pdpu_stab_mpc_ + R_dcm_y*Q_identity_N_calc;
+
+        Qp_stab_mpc_ = SUpx_stab_mpc_.transpose()*Qpx_stab_mpc_*SUpx_stab_mpc_
+                      +SUpy_stab_mpc_.transpose()*Qpy_stab_mpc_*SUpy_stab_mpc_;
+
+        Q_stab_mpc_ = Qp_stab_mpc_;
+
+        gpx_stab_mpc_ = SUpx_stab_mpc_.transpose()*Pdpu_stab_mpc_.transpose()*Q_dcm_x*Q_identity_N_calc*Pdps_stab_mpc_*ssx_mpc_;
+        gpy_stab_mpc_ = SUpy_stab_mpc_.transpose()*Pdpu_stab_mpc_.transpose()*Q_dcm_y*Q_identity_N_calc*Pdps_stab_mpc_*ssy_mpc_;
+
+        gx_ref_stab_mpc_ = SUpx_stab_mpc_.transpose()*Pdpu_stab_mpc_.transpose()*Q_dcm_x*Q_identity_N_calc;
+        gy_ref_stab_mpc_ = SUpy_stab_mpc_.transpose()*Pdpu_stab_mpc_.transpose()*Q_dcm_y*Q_identity_N_calc;
+        
+        g_stab_mpc_.setZero(input_num, 1);
+            
+        const_A_stab_mpc_.setZero(const_num, input_num);
+        const_ub_stab_mpc_.setZero(const_num, 1);
+        const_lb_stab_mpc_.setZero(const_num, 1);
+        
+        QP_MPC_Stabilizer_.InitializeProblemSize(input_num, const_num);
+            
+        MPC_Stabilizer_u_mpc_.setZero(input_num);
+
+        Stabilizer_State_Prev_mpc_.setZero(6, N_stab_mpc);
+             
+        Stab_MPC_first_loop = 1;
+
+        cout << "Initialization of IS LIPM DCM Stabilizer MPC is completed." << endl;
+    }
+
+    Eigen::VectorXd D_x_ref(N_stab_mpc);
+    Eigen::VectorXd D_y_ref(N_stab_mpc);
+    D_x_ref = Planner_State_Prev_mpc_.row(0).segment(0, N_stab_mpc) + b_fip_*Planner_State_Prev_mpc_.row(1).segment(0, N_stab_mpc);
+    D_y_ref = Planner_State_Prev_mpc_.row(3).segment(0, N_stab_mpc) + b_fip_*Planner_State_Prev_mpc_.row(4).segment(0, N_stab_mpc);
+
+    MPC_Stabilizer_state_mpc_(0) = com_measured_mpc_(0);
+    MPC_Stabilizer_state_mpc_(1) = com_dot_measured_mpc_(0);
+    MPC_Stabilizer_state_mpc_(3) = com_measured_mpc_(1);
+    MPC_Stabilizer_state_mpc_(4) = com_dot_measured_mpc_(1);
+
+    g_stab_mpc_ = gpx_stab_mpc_*MPC_Stabilizer_state_mpc_ - gx_ref_stab_mpc_*D_x_ref
+                 +gpy_stab_mpc_*MPC_Stabilizer_state_mpc_ - gy_ref_stab_mpc_*D_y_ref;
+
+    /////////////////////////////////////////////////////////////////
+    //////////////////////////DCM MPC Calc///////////////////////////
+    /////////////////////////////////////////////////////////////////
+
+    QP_MPC_Stabilizer_.EnableEqualityCondition(equality_condition_eps_);
+    QP_MPC_Stabilizer_.UpdateMinProblem(Q_stab_mpc_, g_stab_mpc_);
+    QP_MPC_Stabilizer_.DeleteSubjectToAx();
+    QP_MPC_Stabilizer_.DeleteSubjectToX();
+
+    //ZMP INEQ
+    const_A_stab_mpc_. block(0*N_stab_mpc, 0, 1*N_stab_mpc, input_num) = Ppu_stab_mpc_*SUpx_stab_mpc_;
+    const_A_stab_mpc_. block(1*N_stab_mpc, 0, 1*N_stab_mpc, input_num) = Ppu_stab_mpc_*SUpy_stab_mpc_;
+
+    const_ub_stab_mpc_.block(0*N_stab_mpc, 0, 1*N_stab_mpc, 1)         = zmp_max_x_mpc_.segment(0, N_stab_mpc) - Pps_stab_mpc_*ssx_mpc_*MPC_Stabilizer_state_mpc_;
+    const_lb_stab_mpc_.block(0*N_stab_mpc, 0, 1*N_stab_mpc, 1)         = zmp_min_x_mpc_.segment(0, N_stab_mpc) - Pps_stab_mpc_*ssx_mpc_*MPC_Stabilizer_state_mpc_;
+    const_ub_stab_mpc_.block(1*N_stab_mpc, 0, 1*N_stab_mpc, 1)         = zmp_max_y_mpc_.segment(0, N_stab_mpc) - Pps_stab_mpc_*ssy_mpc_*MPC_Stabilizer_state_mpc_;
+    const_lb_stab_mpc_.block(1*N_stab_mpc, 0, 1*N_stab_mpc, 1)         = zmp_min_y_mpc_.segment(0, N_stab_mpc) - Pps_stab_mpc_*ssy_mpc_*MPC_Stabilizer_state_mpc_;
+
+    //IS EQ
+    Eigen::MatrixXd Const_b_stab_eq; Const_b_stab_eq.setZero(2,1);
+
+    //Const_b_stab_eq(0,0) = (wn_/(1 - lambda_IS_calc))*(MPC_Stabilizer_state_mpc_(0) + MPC_Stabilizer_state_mpc_(1)/wn_ - MPC_Stabilizer_state_mpc_(2))
+    //                      -(pow(lambda_IS_calc, N_stab_mpc)/(1 - pow(lambda_IS_calc, N_step))*(b_IS_step_mpc_.transpose()*P_dot_ref_step_mpc_.col(0))(0,0));
+    Const_b_stab_eq(0,0) = (wn_/(1 - lambda_IS_calc))*(MPC_Stabilizer_state_mpc_(0) + MPC_Stabilizer_state_mpc_(1)/wn_ - MPC_Stabilizer_state_mpc_(2));
+    Const_b_stab_eq(1,0) = (wn_/(1 - lambda_IS_calc))*(MPC_Stabilizer_state_mpc_(3) + MPC_Stabilizer_state_mpc_(4)/wn_ - MPC_Stabilizer_state_mpc_(5))
+                          -(pow(lambda_IS_calc, N_stab_mpc)/(1 + pow(lambda_IS_calc, N_step))*(b_IS_step_mpc_.transpose()*P_dot_ref_step_mpc_.col(1))(0,0));
+
+    const_A_stab_mpc_.row(2*N_stab_mpc + 0) = b_IS_stab_mpc_.transpose()*SUpx_stab_mpc_;
+    const_A_stab_mpc_.row(2*N_stab_mpc + 1) = b_IS_stab_mpc_.transpose()*SUpy_stab_mpc_;
+
+    const_ub_stab_mpc_(2*N_stab_mpc + 0, 0) = Const_b_stab_eq(0,0);
+    const_lb_stab_mpc_(2*N_stab_mpc + 0, 0) = Const_b_stab_eq(0,0);
+    const_ub_stab_mpc_(2*N_stab_mpc + 1, 0) = Const_b_stab_eq(1,0);
+    const_lb_stab_mpc_(2*N_stab_mpc + 1, 0) = Const_b_stab_eq(1,0);
+
+    QP_MPC_Stabilizer_.UpdateSubjectToAx(const_A_stab_mpc_, const_lb_stab_mpc_, const_ub_stab_mpc_);
+
+    if(QP_MPC_Stabilizer_.SolveQPoases(100, MPC_Stabilizer_u_mpc_))
+    {
+        if((walking_tick_mpc_ - 1000/int(mpc_freq) + 1)%4000 == 0)
+        { cout << "IS LIPM DCM MPC Stabilizer solved" << endl; }
+
+        Stabilizer_State_Prev_mpc_.row(0).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0, 3) + Pcpu_stab_mpc_*SUpx_stab_mpc_*MPC_Stabilizer_u_mpc_;
+        Stabilizer_State_Prev_mpc_.row(1).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0, 3) + Pcvu_stab_mpc_*SUpx_stab_mpc_*MPC_Stabilizer_u_mpc_;
+        Stabilizer_State_Prev_mpc_.row(2).transpose() = Pps_stab_mpc_ *MPC_Stabilizer_state_mpc_.segment(0, 3) + Ppu_stab_mpc_ *SUpx_stab_mpc_*MPC_Stabilizer_u_mpc_;
+
+        Stabilizer_State_Prev_mpc_.row(3).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3, 3) + Pcpu_stab_mpc_*SUpy_stab_mpc_*MPC_Stabilizer_u_mpc_;
+        Stabilizer_State_Prev_mpc_.row(4).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3, 3) + Pcvu_stab_mpc_*SUpy_stab_mpc_*MPC_Stabilizer_u_mpc_;
+        Stabilizer_State_Prev_mpc_.row(5).transpose() = Pps_stab_mpc_ *MPC_Stabilizer_state_mpc_.segment(3, 3) + Ppu_stab_mpc_ *SUpy_stab_mpc_*MPC_Stabilizer_u_mpc_;
+
+        MPC_Stabilizer_state_mpc_.segment(0,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + B_mpc_*(SUpx_stab_mpc_*MPC_Stabilizer_u_mpc_)(0);
+        MPC_Stabilizer_state_mpc_.segment(3,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + B_mpc_*(SUpy_stab_mpc_*MPC_Stabilizer_u_mpc_)(0);
+    }
+    else
+    { 
+        cout << "IS LIPM DCM MPC Stabilizer Not solved" << endl;
+        cout << int((walking_tick_mpc_ + 1)*mpc_freq/hz_) << endl;
+        cout << endl;
+
+        Stabilizer_State_Prev_mpc_.row(0).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0, 3) + Pcpu_stab_mpc_*SUpx_stab_mpc_*MPC_Stabilizer_u_mpc_;
+        Stabilizer_State_Prev_mpc_.row(1).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0, 3) + Pcvu_stab_mpc_*SUpx_stab_mpc_*MPC_Stabilizer_u_mpc_;
+        Stabilizer_State_Prev_mpc_.row(2).transpose() = Pps_stab_mpc_ *MPC_Stabilizer_state_mpc_.segment(0, 3) + Ppu_stab_mpc_ *SUpx_stab_mpc_*MPC_Stabilizer_u_mpc_;
+
+        Stabilizer_State_Prev_mpc_.row(3).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3, 3) + Pcpu_stab_mpc_*SUpy_stab_mpc_*MPC_Stabilizer_u_mpc_;
+        Stabilizer_State_Prev_mpc_.row(4).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3, 3) + Pcvu_stab_mpc_*SUpy_stab_mpc_*MPC_Stabilizer_u_mpc_;
+        Stabilizer_State_Prev_mpc_.row(5).transpose() = Pps_stab_mpc_ *MPC_Stabilizer_state_mpc_.segment(3, 3) + Ppu_stab_mpc_ *SUpy_stab_mpc_*MPC_Stabilizer_u_mpc_;
+
+        MPC_Stabilizer_state_mpc_.segment(0,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + B_mpc_*(SUpx_stab_mpc_*MPC_Stabilizer_u_mpc_)(0);
+        MPC_Stabilizer_state_mpc_.segment(3,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + B_mpc_*(SUpy_stab_mpc_*MPC_Stabilizer_u_mpc_)(0);
+    }
+
+    e_tmp_graph7  << D_x_ref.transpose() << endl;
+    e_tmp_graph8  << D_y_ref.transpose() << endl;
+    e_tmp_graph9  << Stabilizer_State_Prev_mpc_.row(0) << endl;
+    e_tmp_graph10 << Stabilizer_State_Prev_mpc_.row(2) << endl;
+    e_tmp_graph11 << Stabilizer_State_Prev_mpc_.row(3) << endl;
+    e_tmp_graph12 << Stabilizer_State_Prev_mpc_.row(5) << endl;
+    e_tmp_graph13 << zmp_max_y_mpc_.transpose().segment(0, N_stab_mpc) << endl;
+
+    e_mpc_stabilizer_data << MPC_Stabilizer_state_mpc_(0) << "," << MPC_Stabilizer_state_mpc_(3) << ","
+                          << MPC_Stabilizer_state_mpc_(1) << "," << MPC_Stabilizer_state_mpc_(4) << ","
+                          << MPC_Stabilizer_state_mpc_(2) << "," << MPC_Stabilizer_state_mpc_(5) << ","
+                          << com_measured_mpc_(0)         << "," << com_measured_mpc_(1)         << ","
+                          << com_dot_measured_mpc_(0)     << "," << com_dot_measured_mpc_(1)     << ","
+                          << endl;
 }
 
 void AvatarController::getComTrajectory_Preview()
@@ -12403,7 +12679,6 @@ void AvatarController::CP_compen_MJ_FT()
     }
 
     //////////// Force
-
     F_F_input_dot = 0.0001 * ((l_ft_(2) - r_ft_(2)) - (F_L - F_R)) - 3.0 * F_F_input;
     if(param_sim_mode_) { F_F_input_dot = 0.0001 * ((l_ft_(2) - r_ft_(2)) - (F_L - F_R)) - 3.0 * F_F_input; }
 

@@ -1447,9 +1447,11 @@ public:
     void comGenerator_mpc(const unsigned int norm_size, const unsigned planning_step_num);
 
     //MPC
-    void IScomGenerator_LIPM_MPC(double mpc_freq, double dt_, double preview_time_, int MPC_synchro_hz_);
-    void dcmcontroller_LIPM_step_total(double mpc_freq, double preview_time_);
+    void IS_LIPM_CoM_Planner_MPC(double mpc_freq, double dt_, double preview_time_, int MPC_synchro_hz_);
+    void IS_LIPM_DCM_Stabilizer_MPC(double mpc_freq, double preview_time_);
+
     void econom2_thread_stepchange();
+
     //////////////////////////////// Econom2 variables
     //yaml
     bool param_sim_mode_;
@@ -1467,11 +1469,10 @@ public:
 
     //MPC
     CQuadraticProgram QP_MPC_Planner_;
-    std::atomic<bool> atb_mpc_planner_update_{false};
-    std::atomic<bool> atb_mpc_stabilizer_update_{false};
-    std::atomic<bool> atb_main_update_{false};
-    bool mpc_planner_update_{false};
-    bool mpc_stabilizer_update_{false};
+    CQuadraticProgram QP_MPC_Stabilizer_;
+    std::atomic<bool> atb_mpc_to_main_update_{false};
+    std::atomic<bool> atb_main_to_mpc_update_{false};
+    bool mpc_update_{false};
 
     int current_step_num_mpc_;
     int current_step_num_container_to_mpc_;
@@ -1510,38 +1511,72 @@ public:
     Eigen::MatrixXd Ccp_mpc_;
     Eigen::MatrixXd Ccv_mpc_;
     Eigen::MatrixXd Cp_mpc_;
+    Eigen::MatrixXd Cdp_mpc_;
 
     Eigen::MatrixXd Pcps_mpc_;
     Eigen::MatrixXd Pcvs_mpc_;
     Eigen::MatrixXd Pps_mpc_;
+    Eigen::MatrixXd Pdps_stab_mpc_;
+    Eigen::MatrixXd Pcps_stab_mpc_;
+    Eigen::MatrixXd Pcvs_stab_mpc_;
+    Eigen::MatrixXd Pps_stab_mpc_;
 
     Eigen::MatrixXd Pcpu_mpc_;
     Eigen::MatrixXd Pcvu_mpc_;
     Eigen::MatrixXd Ppu_mpc_;
+    Eigen::MatrixXd Pdpu_stab_mpc_;
+    Eigen::MatrixXd Pcpu_stab_mpc_;
+    Eigen::MatrixXd Pcvu_stab_mpc_;
+    Eigen::MatrixXd Ppu_stab_mpc_;
 
     Eigen::MatrixXd P_IS_mpc_;
+    Eigen::MatrixXd P_IS_stab_mpc_;
     Eigen::MatrixXd P_IS_step_mpc_;
 
     Eigen::MatrixXd b_IS_mpc_;
+    Eigen::MatrixXd b_IS_stab_mpc_;
     Eigen::MatrixXd b_IS_step_mpc_;
 
     Eigen::MatrixXd p_IS_mpc_;
+    Eigen::MatrixXd p_IS_stab_mpc_;
     Eigen::MatrixXd p_IS_step_mpc_;
 
     Eigen::MatrixXd SUx_mpc_, SUy_mpc_, SUz_mpc_;
     Eigen::MatrixXd ssx_mpc_, ssy_mpc_, ssz_mpc_;
+    Eigen::MatrixXd SUp_stab_mpc_,  SUf_stab_mpc_,  SUi_stab_mpc_;
+    Eigen::MatrixXd SUpx_stab_mpc_, SUfx_stab_mpc_, SUix_stab_mpc_;
+    Eigen::MatrixXd SUpy_stab_mpc_, SUfy_stab_mpc_, SUiy_stab_mpc_;
 
     Eigen::MatrixXd Q_mpc_;
+    Eigen::MatrixXd Q_stab_mpc_;
+    Eigen::MatrixXd Qp_stab_mpc_;
+    Eigen::MatrixXd Qpx_stab_mpc_;
+    Eigen::MatrixXd Qpy_stab_mpc_;
+    Eigen::MatrixXd Qf_stab_mpc_;
+    Eigen::MatrixXd Qfx_stab_mpc_;
+    Eigen::MatrixXd Qfy_stab_mpc_;
+    Eigen::MatrixXd Qi_stab_mpc_;
+    Eigen::MatrixXd Qix_stab_mpc_;
+    Eigen::MatrixXd Qiy_stab_mpc_;
     Eigen::MatrixXd Qx_mpc_;
     Eigen::MatrixXd Qy_mpc_;
     Eigen::MatrixXd Qz_mpc_;
 
     Eigen::MatrixXd g_mpc_;
+    Eigen::MatrixXd g_stab_mpc_;
+    Eigen::MatrixXd gpx_stab_mpc_;
+    Eigen::MatrixXd gpy_stab_mpc_;
+    Eigen::MatrixXd gfx_stab_mpc_;
+    Eigen::MatrixXd gfy_stab_mpc_;
+    Eigen::MatrixXd gix_stab_mpc_;
+    Eigen::MatrixXd giy_stab_mpc_;
     Eigen::MatrixXd gx_mpc_;
     Eigen::MatrixXd gy_mpc_;
     Eigen::MatrixXd gz_mpc_;
     Eigen::MatrixXd gx_ref_mpc_;
+    Eigen::MatrixXd gx_ref_stab_mpc_;
     Eigen::MatrixXd gy_ref_mpc_;
+    Eigen::MatrixXd gy_ref_stab_mpc_;
     Eigen::MatrixXd gz_ref_mpc_;
 
     Eigen::VectorXd MPC_Planner_u_mpc_;
@@ -1553,12 +1588,16 @@ public:
     Eigen::VectorXd MPC_Stabilizer_u_main_;
 
     Eigen::MatrixXd const_A_mpc_;
+    Eigen::MatrixXd const_A_stab_mpc_;
     Eigen::MatrixXd const_ub_mpc_;
+    Eigen::MatrixXd const_ub_stab_mpc_;
     Eigen::MatrixXd const_lb_mpc_;
+    Eigen::MatrixXd const_lb_stab_mpc_;
 
     Eigen::MatrixXd P_dot_ref_step_mpc_;
 
     Eigen::MatrixXd Planner_State_Prev_mpc_;
+    Eigen::MatrixXd Stabilizer_State_Prev_mpc_;
 
     Eigen::VectorXd zmp_max_x_mpc_;
     Eigen::VectorXd zmp_min_x_mpc_;
@@ -1575,6 +1614,7 @@ public:
     Eigen::VectorXd MPC_Stabilizer_state_main_;
     Eigen::VectorXd Stabilizer_state_main_calc_;
     
+    double step_candidate_num_;
 private:    
     //////////////////////////////// Myeong-Ju
     unsigned int walking_tick_ = 0;
