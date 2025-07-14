@@ -1216,6 +1216,8 @@ public:
     Eigen::MatrixXd ref_zmp_mpc_;
     Eigen::MatrixXd ref_zmp_container_to_mpc_;
 
+    Eigen::MatrixXd ref_vrp_mpc_;
+
     Eigen::Vector3d xs_mj_;
     Eigen::Vector3d ys_mj_;
     Eigen::Vector3d xd_mj_;
@@ -1352,7 +1354,10 @@ public:
 
     //IS MPC QCQP
     void IS_LIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
+    void IS_VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
+    void VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
     void IS_LIPM_DCM_Stabilizer_MPC(double mpc_freq, double preview_window);
+    void IS_VHIPM_DCM_Stabilizer_MPC(double mpc_freq, double preview_window);
     void econom2_thread_stepchange();
 
     //Matrix
@@ -1376,6 +1381,7 @@ public:
     Eigen::MatrixXd Cdp_mpc_;
     Eigen::MatrixXd Ccp_mpc_;
     Eigen::MatrixXd Ccv_mpc_;
+    Eigen::MatrixXd Cca_mpc_;
     Eigen::MatrixXd Cvp_mpc_;
 
     Eigen::MatrixXd P_IS_step_mpc_;
@@ -1393,10 +1399,12 @@ public:
 
     Eigen::MatrixXd Pcps_plan_mpc_;
     Eigen::MatrixXd Pcvs_plan_mpc_;
+    Eigen::MatrixXd Pcas_plan_mpc_;
     Eigen::MatrixXd Pvps_plan_mpc_;
     
     Eigen::MatrixXd Pcpu_plan_mpc_;
     Eigen::MatrixXd Pcvu_plan_mpc_;
+    Eigen::MatrixXd Pcau_plan_mpc_;
     Eigen::MatrixXd Pvpu_plan_mpc_;
 
     Eigen::MatrixXd Qxcalc_plan_mpc_;
