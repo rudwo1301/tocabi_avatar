@@ -64,6 +64,7 @@ public:
     std::atomic<bool> atb_desired_q_update_{false};
     std::atomic<bool> atb_walking_traj_update_{false};
     std::atomic<bool> atb_mpc_update_{false};
+    std::atomic<bool> atb_desired_torque_update_{false};
 
     RigidBodyDynamics::Model model_d_;  //updated by desired q
     RigidBodyDynamics::Model model_c_;  //updated by current q
@@ -1066,9 +1067,10 @@ public:
     void GravityCalculate_MJ();
     
     void getZmpTrajectory();
-    void zmpGenerator(const unsigned int norm_size, const unsigned planning_step_num);
+    void zmpGenerator_wComZ_e(const unsigned int norm_size, const unsigned planning_step_num);
     void onestepZmp(unsigned int current_step_number, Eigen::VectorXd& temp_px, Eigen::VectorXd& temp_py);
     void onestepZmp_wo_offset(unsigned int current_step_number, double t_total_zmp, Eigen::VectorXd& temp_px, Eigen::VectorXd& temp_py, Eigen::VectorXd& temp_px_wo_offset, Eigen::VectorXd& temp_py_wo_offset);
+    void onestepComZ(unsigned int current_step_number, double t_total_zmp, Eigen::VectorXd& temp_cz);
     void getComTrajectory();
     void getFootTrajectory();
     void getFootTrajectory_stepping();
@@ -1172,11 +1174,34 @@ public:
     Eigen::Isometry3d lfoot_pitch_rot_;
 
     Eigen::Isometry3d pelv_float_current_;
+    Eigen::Vector6d   pelv_float_current_dot_;
     Eigen::Isometry3d lfoot_float_current_;
     Eigen::Isometry3d rfoot_float_current_;
+    Eigen::Vector6d   lfoot_float_current_dot_;
+    Eigen::Vector6d   rfoot_float_current_dot_;
+    Eigen::Isometry3d lfoot_float_current_fast_;
+    Eigen::Isometry3d rfoot_float_current_fast_;
+    Eigen::Isometry3d lfoot_float_current_slow_;
+    Eigen::Isometry3d rfoot_float_current_slow_;
     Eigen::Isometry3d pelv_float_init_;
+
+    Eigen::Isometry3d lhand_float_current_;
+    Eigen::Isometry3d rhand_float_current_;
+    Eigen::Isometry3d chest_float_current_;
+
+    Eigen::Isometry3d lhand_support_current_;
+    Eigen::Isometry3d rhand_support_current_;
+    Eigen::Isometry3d chest_support_current_;
+    
+    Eigen::Vector6d   lhand_float_current_dot_;
+    Eigen::Vector6d   rhand_float_current_dot_;
+    Eigen::Vector6d   chest_float_current_dot_;
+
+    Eigen::Isometry3d upper_float_init_;
+
     Eigen::Isometry3d lfoot_float_init_;
     Eigen::Isometry3d rfoot_float_init_;
+
     double b_ = 0.0;
     double w_ = 0.0;
     
@@ -1198,6 +1223,8 @@ public:
     Eigen::Isometry3d pelv_support_current_;
     Eigen::Isometry3d lfoot_support_current_;
     Eigen::Isometry3d rfoot_support_current_;
+    Eigen::Vector6d   lfoot_support_current_dot_;
+    Eigen::Vector6d   rfoot_support_current_dot_;
 
     Eigen::Isometry3d lfoot_support_init_;
     Eigen::Isometry3d rfoot_support_init_;
@@ -1249,6 +1276,7 @@ public:
     double R_angle = 0;
     double R_angle_input_dot = 0;
     double R_angle_input = 0;
+    double Y_angle = 0;
     double aa = 0; 
 
     double del_t = 0.0005;
@@ -1346,13 +1374,67 @@ public:
     double zmp_x_min = 0.09;
     double zmp_y_max = 0.075;
     double zmp_y_min = 0.075;
-
+    
+    //wbd
     Eigen::Vector6d lfoot_contact_wrench;
     Eigen::Vector6d rfoot_contact_wrench;
     Eigen::Vector12d contact_wrench_;
     Eigen::Vector12d contact_wrench_container_;
     Eigen::Vector12d contact_wrench_fast_;
+
+    Eigen::VectorQd MitWholebodyInverseDynamicsController(const Eigen::VectorQd &torque_prev, const Eigen::VectorVQd &qddot_cmd, const Eigen::Vector12d &f_c_cmd);
+
+    bool is_wbid_init_ = true;
     
+    bool is_lfoot_support_ = false;
+    bool is_lfoot_support_container_ = false;
+    bool is_lfoot_support_fast_ = false;
+
+    bool is_rfoot_support_ = false;
+    bool is_rfoot_support_container_ = false;
+    bool is_rfoot_support_fast_ = false;
+
+    bool is_ssp_ = false;
+    bool is_ssp_container_ = false;
+    bool is_ssp_fast_ = false;
+
+    bool is_dsp_ = false;
+    bool is_dsp_container_ = false;
+    bool is_dsp_fast_ = false;
+
+    unsigned int num_contact_;
+
+    CQuadraticProgram QP_wbid;
+
+    Eigen::Matrix6Vd J_lfoot_;
+    Eigen::Matrix6Vd J_lfoot_pre_;
+    Eigen::Matrix6Vd J_lfoot_dot_;
+    Eigen::Matrix6Vd J_rfoot_;
+    Eigen::Matrix6Vd J_rfoot_pre_;
+    Eigen::Matrix6Vd J_rfoot_dot_;
+
+    Eigen::VectorQd torque_min;
+    Eigen::VectorQd torque_max;
+
+    double W_qb_x_wbid = 0.0;
+    double W_qb_y_wbid = 0.0;
+    double W_qb_z_wbid = 0.0;
+    double W_qb_roll_wbid = 0.0;
+    double W_qb_pitch_wbid = 0.0;
+    double W_qb_yaw_wbid = 0.0;
+
+    double W_qa_wbid = 0.0;
+
+    double W_torque_1_wbid = 0.0;
+    double W_torque_2_wbid = 0.0;
+    double W_f_lfoot_wbid = 0.0;
+    double W_f_rfoot_wbid = 0.0;
+    double W_c_lfoot_wbid = 0.0;
+    double W_c_rfoot_wbid = 0.0;
+    
+    void StateMachine();
+    //
+
     void VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
     void econom2_thread_stepchange();
 
@@ -1369,8 +1451,11 @@ public:
     int current_step_num_container_from_mpc_;
 
     Eigen::MatrixXd ref_com_;
+    Eigen::MatrixXd ref_com_z_;
     Eigen::MatrixXd ref_com_mpc_;
+    Eigen::MatrixXd ref_com_z_mpc_;
     Eigen::MatrixXd ref_com_container_to_mpc_;
+    Eigen::MatrixXd ref_com_z_container_to_mpc_;
 
     Eigen::MatrixXd A_mpc_;
     Eigen::MatrixXd B_mpc_;
@@ -1428,6 +1513,40 @@ public:
     Eigen::VectorXd MPC_Planner_u_container_from_mpc_;
     
     Eigen::MatrixXd Planner_State_Prev_mpc_;
+
+    //WBD
+    void getVirtualJointState(const Eigen::Isometry3d& transform_global_to_float, const Eigen::Isometry3d& transform_float_to_support);
+
+    Eigen::VectorVQd q_virtual_;
+    Eigen::VectorVQd qdot_virtual_;
+    Eigen::VectorVQd qddot_virtual_;
+
+    Eigen::VectorVQd q_error_virtual_;
+    Eigen::VectorVQd q_desired_virtual_;
+    Eigen::VectorVQd q_desired_virtual_pre_;
+    Eigen::VectorVQd qdot_desired_virtual_;
+    Eigen::VectorVQd qddot_desired_virtual_;
+    Eigen::VectorVQd qddot_desired_virtual_container_;
+    Eigen::VectorVQd qddot_desired_virtual_fast_;
+
+    Eigen::VectorVQd Kp_virtual_;
+    Eigen::VectorVQd Kd_virtual_;
+
+    Eigen::Isometry3d lhand_trajectory_float_;
+    Eigen::Isometry3d rhand_trajectory_float_;
+    Eigen::Isometry3d chest_trajectory_float_;
+
+    Eigen::Isometry3d lhand_trajectory_support_;
+    Eigen::Isometry3d rhand_trajectory_support_;
+    Eigen::Isometry3d chest_trajectory_support_;
+
+    Eigen::VectorQd torque_wbd_;
+    Eigen::VectorQd torque_wbd_container_;
+    Eigen::VectorQd torque_wbd_fast_;
+    
+    Eigen::VectorQd torque_desired_prev_;
+    Eigen::VectorQd torque_desired_prev_container_;
+    Eigen::VectorQd torque_desired_prev_fast_;
 
 private:    
     unsigned int walking_tick_ = 0;
