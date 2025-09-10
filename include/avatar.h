@@ -1350,9 +1350,17 @@ public:
     Eigen::Vector2d zmp_max_;
     Eigen::Vector2d zmp_min_;
     Eigen::VectorXd zmp_max_x_mpc_;
+    Eigen::VectorXd zmp_max_Lx_mpc_;
+    Eigen::VectorXd zmp_max_Rx_mpc_;
     Eigen::VectorXd zmp_min_x_mpc_;
+    Eigen::VectorXd zmp_min_Lx_mpc_;
+    Eigen::VectorXd zmp_min_Rx_mpc_;
     Eigen::VectorXd zmp_max_y_mpc_;
+    Eigen::VectorXd zmp_max_Ly_mpc_;
+    Eigen::VectorXd zmp_max_Ry_mpc_;
     Eigen::VectorXd zmp_min_y_mpc_;
+    Eigen::VectorXd zmp_min_Ly_mpc_;
+    Eigen::VectorXd zmp_min_Ry_mpc_;
 
     Eigen::Vector3d vrp_desired_;
 
@@ -1502,6 +1510,13 @@ public:
     Eigen::MatrixXd SUx_plan_mpc_;
     Eigen::MatrixXd SUy_plan_mpc_;
     Eigen::MatrixXd SUz_plan_mpc_;
+    Eigen::MatrixXd SULx_plan_mpc_;
+    Eigen::MatrixXd SULy_plan_mpc_;
+    Eigen::MatrixXd SULz_plan_mpc_;
+    Eigen::MatrixXd SURx_plan_mpc_;
+    Eigen::MatrixXd SURy_plan_mpc_;
+    Eigen::MatrixXd SURz_plan_mpc_;
+    Eigen::MatrixXd SUafd_plan_mpc_;
 
     Eigen::MatrixXd Qmat_plan_mpc_;
     Eigen::MatrixXd b_IS_plan_mpc_;
@@ -1520,7 +1535,11 @@ public:
     Eigen::VectorXd MPC_Planner_SQP_du_mpc_;
     Eigen::VectorXd MPC_Planner_u_main_;
     Eigen::VectorXd MPC_Planner_u_container_from_mpc_;
-    
+
+    Eigen::VectorXd MPC_Planner_LVRP_mpc_;
+    Eigen::VectorXd MPC_Planner_RVRP_mpc_;
+    Eigen::VectorXd MPC_Planner_alpha_foot_dist_mpc_;
+
     Eigen::MatrixXd Planner_State_Prev_mpc_;
 
     //Stabilizer
@@ -1557,6 +1576,16 @@ public:
     Eigen::MatrixXd SUpy_stab_mpc_;
     Eigen::MatrixXd SUpz_stab_mpc_;
     Eigen::MatrixXd SUp_stab_mpc_;
+
+    Eigen::MatrixXd SUpC1x_stab_mpc_;
+    Eigen::MatrixXd SUpC1y_stab_mpc_;
+    Eigen::MatrixXd SUpC1z_stab_mpc_;
+    Eigen::MatrixXd SUpC1_stab_mpc_;
+
+    Eigen::MatrixXd SUpC2x_stab_mpc_;
+    Eigen::MatrixXd SUpC2y_stab_mpc_;
+    Eigen::MatrixXd SUpC2z_stab_mpc_;
+    Eigen::MatrixXd SUpC2_stab_mpc_;
 
     Eigen::MatrixXd SUfx_stab_mpc_;
     Eigen::MatrixXd SUfxf_stab_mpc_;
