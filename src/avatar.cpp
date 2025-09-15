@@ -8603,7 +8603,7 @@ void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, 
 
     if(MPC_first_loop == 0)
     {
-        cout << "Initialization of VHIPM QC Planner MPC." << endl;
+        cout << "Initialization of VHIPM SQ Planner MPC." << endl;
         A_mpc_.resize(N_state,N_state);
         Eigen::MatrixXd A_mpc_cont; A_mpc_cont.resize(N_state, N_state); A_mpc_cont.setZero();
         A_mpc_cont << 0, 1, 0,
@@ -8702,7 +8702,7 @@ void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, 
         zmp_min_y_mpc_.setZero(N_plan_mpc);
 
         MPC_first_loop = 1;
-        cout << "Initialization of VHIPM QC Planner MPC is completed." << endl;
+        cout << "Initialization of VHIPM SQ Planner MPC is completed." << endl;
     }
 
     Eigen::VectorXd Pv_x_ref(N_plan_mpc);
