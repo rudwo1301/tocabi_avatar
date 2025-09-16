@@ -1364,6 +1364,10 @@ public:
     Eigen::VectorXd zmp_min_x_mpc_;
     Eigen::VectorXd zmp_max_y_mpc_;
     Eigen::VectorXd zmp_min_y_mpc_;
+    Eigen::VectorXd zmp_max_Lpy_mpc_;
+    Eigen::VectorXd zmp_min_Lpy_mpc_;
+    Eigen::VectorXd zmp_max_Rpy_mpc_;
+    Eigen::VectorXd zmp_min_Rpy_mpc_;
 
     bool param_sim_mode_;
     double param_ext_force_time_;
@@ -1465,12 +1469,19 @@ public:
     Eigen::MatrixXd Cca_mpc_;
     Eigen::MatrixXd Cvp_mpc_;
 
+    Eigen::MatrixXd const_SQP_Phi_mpc_;
+    Eigen::MatrixXd const_SQP_Phi_mpc_calc_;
+    Eigen::MatrixXd const_SQP_Pi_mpc_;
+    Eigen::MatrixXd const_SQP_ri_mpc_;
+    Eigen::MatrixXd const_SQP_hi_mpc_;
     Eigen::MatrixXd const_A_mpc_;
     Eigen::MatrixXd const_ub_mpc_;
     Eigen::MatrixXd const_lb_mpc_;
 
     //Planner
-    CQuadraticProgram QP_MPC_Planner_;
+    CQuadraticProgram QP_MPC_Planner_X_;
+    CQuadraticProgram QP_MPC_Planner_Y_;
+    CQuadraticProgram QP_MPC_Planner_Z_;
 
     Eigen::MatrixXd Pcps_plan_mpc_;
     Eigen::MatrixXd Pcvs_plan_mpc_;
@@ -1486,15 +1497,22 @@ public:
     Eigen::MatrixXd Qycalc_plan_mpc_;
     Eigen::MatrixXd Qzcalc_plan_mpc_;
     Eigen::MatrixXd Qcalc_plan_mpc_;
+    Eigen::MatrixXd deldelQcalc_plan_mpc_;
 
     Eigen::MatrixXd gcalc_plan_mpc_;
     Eigen::MatrixXd gxcalc_plan_mpc_;
     Eigen::MatrixXd gycalc_plan_mpc_;
     Eigen::MatrixXd gzcalc_plan_mpc_;
+    Eigen::MatrixXd delgcalc_plan_mpc_;
 
     Eigen::MatrixXd SUx_plan_mpc_;
     Eigen::MatrixXd SUy_plan_mpc_;
     Eigen::MatrixXd SUz_plan_mpc_;
+
+    Eigen::MatrixXd SUp_plan_mpc_;
+    Eigen::MatrixXd SUpa_plan_mpc_;
+    Eigen::MatrixXd SUplp_plan_mpc_;
+    Eigen::MatrixXd SUprp_plan_mpc_;
 
     Eigen::MatrixXd Qmat_plan_mpc_;
     Eigen::MatrixXd ssx_plan_mpc_;
@@ -1507,7 +1525,12 @@ public:
     Eigen::VectorXd Planner_state_main_calc_;
     Eigen::VectorXd MPC_Planner_state_from_mpc_to_main_;
     
-    Eigen::VectorXd MPC_Planner_u_mpc_;
+    Eigen::VectorXd MPC_Planner_u_mpc_x_;
+    Eigen::VectorXd MPC_Planner_u_mpc_y_;
+    Eigen::VectorXd MPC_Planner_u_mpc_z_;
+    Eigen::VectorXd MPC_Planner_delu_mpc_x_;
+    Eigen::VectorXd MPC_Planner_delu_mpc_y_;
+    Eigen::VectorXd MPC_Planner_delu_mpc_z_;
     Eigen::VectorXd MPC_SQ_Planner_u_mpc_;
     Eigen::VectorXd MPC_Planner_u_main_;
     Eigen::VectorXd MPC_Planner_u_container_from_mpc_;

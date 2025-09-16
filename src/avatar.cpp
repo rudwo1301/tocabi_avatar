@@ -5495,7 +5495,7 @@ void AvatarController::computeThread3()
         atb_main_to_mpc_update_ = false;
     }
 
-    thread3_hz_ = 50.0;
+    thread3_hz_ = 20.0;
 
     VHIPM_CoM_SQ_Planner_MPC(thread3_hz_, 1.0/thread3_hz_, 1.6, 2000/thread3_hz_);
     std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
@@ -8589,11 +8589,14 @@ void AvatarController::getComTrajectory_mpc()
 ////////////////////// Econom2 function
 void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz)
 {
-    double wpvx, wpvy, wpvz;
-    double wdvx, wdvy, wdvz;
+    double wpvx,  wpvy, wpvz;
+    double wdvx,  wdvy, wdvz;
+    double wplvy, wprvy;
 
-    wpvx = 1e+6; wpvy = 1e+6; wpvz = 1e+4;
-    wdvx = 1e+0; wdvy = 1e+0; wdvz = 1e+0;
+    wpvx  = 1e+6; wpvy = 1e+6; wpvz = 1e+4;
+    wdvx  = 1e+0; wdvy = 1e+0; wdvz = 1e+0;
+    wplvy = 1e+2;
+    wprvy = 1e+2;
 
     int mpc_tick = walking_tick_mpc_ - com_start_tick_mpc_;
     const int N_plan_mpc = mpc_preview_window*mpc_freq;
@@ -8675,21 +8678,32 @@ void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, 
         Qmat_plan_mpc_.resize(N_plan_mpc, N_plan_mpc);
         Qmat_plan_mpc_.setIdentity();
 
-        Qxcalc_plan_mpc_.setZero(N_plan_mpc, N_plan_mpc);
-        Qycalc_plan_mpc_.setZero(N_plan_mpc, N_plan_mpc);
+        Qxcalc_plan_mpc_.setZero(4*N_plan_mpc, 4*N_plan_mpc);
+        Qycalc_plan_mpc_.setZero(4*N_plan_mpc, 4*N_plan_mpc);
         Qzcalc_plan_mpc_.setZero(N_plan_mpc, N_plan_mpc);
         Qzcalc_plan_mpc_ = Pcpu_plan_mpc_.transpose()*wpvz*Qmat_plan_mpc_*Pcpu_plan_mpc_ + wdvz*Qmat_plan_mpc_;
         
-        gxcalc_plan_mpc_.setZero(N_plan_mpc, N_plan_mpc);
-        gycalc_plan_mpc_.setZero(N_plan_mpc, N_plan_mpc);
+        gxcalc_plan_mpc_.setZero(4*N_plan_mpc, N_plan_mpc);
+        gycalc_plan_mpc_.setZero(4*N_plan_mpc, N_plan_mpc);
         gzcalc_plan_mpc_.setZero(N_plan_mpc, N_plan_mpc);
         gzcalc_plan_mpc_ = Pcpu_plan_mpc_.transpose()*wpvz*Qmat_plan_mpc_;
 
-        gcalc_plan_mpc_.setZero(N_plan_mpc, N_plan_mpc);
+        QP_MPC_Planner_X_.InitializeProblemSize(4*N_plan_mpc, 10*N_plan_mpc);
+        QP_MPC_Planner_Y_.InitializeProblemSize(4*N_plan_mpc, 10*N_plan_mpc);
+        QP_MPC_Planner_Z_.InitializeProblemSize(N_plan_mpc, N_plan_mpc);
 
-        QP_MPC_Planner_.InitializeProblemSize(N_plan_mpc, N_plan_mpc);
+        SUp_plan_mpc_.setZero (N_plan_mpc, 4*N_plan_mpc);
+        SUpa_plan_mpc_.setZero(N_plan_mpc, 4*N_plan_mpc);
+        SUplp_plan_mpc_.setZero(N_plan_mpc, 4*N_plan_mpc);
+        SUprp_plan_mpc_.setZero(N_plan_mpc, 4*N_plan_mpc);
+        SUp_plan_mpc_.block (0, 0*N_plan_mpc, N_plan_mpc, N_plan_mpc) = MatrixXd::Identity(N_plan_mpc, N_plan_mpc);
+        SUpa_plan_mpc_.block(0, 1*N_plan_mpc, N_plan_mpc, N_plan_mpc) = MatrixXd::Identity(N_plan_mpc, N_plan_mpc);
+        SUplp_plan_mpc_.block(0, 2*N_plan_mpc, N_plan_mpc, N_plan_mpc) = MatrixXd::Identity(N_plan_mpc, N_plan_mpc);
+        SUprp_plan_mpc_.block(0, 3*N_plan_mpc, N_plan_mpc, N_plan_mpc) = MatrixXd::Identity(N_plan_mpc, N_plan_mpc);
 
-        MPC_Planner_u_mpc_.setZero(N_plan_mpc);
+        MPC_Planner_u_mpc_x_.setZero(4*N_plan_mpc);
+        MPC_Planner_u_mpc_y_.setZero(4*N_plan_mpc);
+        MPC_Planner_u_mpc_z_.setZero(N_plan_mpc);
 
         Planner_State_Prev_mpc_.setZero(9, N_plan_mpc);
         
@@ -8699,6 +8713,8 @@ void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, 
         zmp_min_x_mpc_.setZero(N_plan_mpc);
 
         zmp_max_y_mpc_.setZero(N_plan_mpc);
+        zmp_max_Lpy_mpc_.setZero(N_plan_mpc);
+        zmp_max_Rpy_mpc_.setZero(N_plan_mpc);
         zmp_min_y_mpc_.setZero(N_plan_mpc);
 
         MPC_first_loop = 1;
@@ -8718,48 +8734,64 @@ void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, 
         zmp_max_x_mpc_(i) = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1),0) + zmp_x_max;     
         zmp_min_x_mpc_(i) = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1),0) - zmp_x_min;
 
-        zmp_max_y_mpc_(i) = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1),1) + zmp_y_max;
-        zmp_min_y_mpc_(i) = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1),1) - zmp_y_min;
+        zmp_max_y_mpc_(i)   = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1),1) + zmp_y_max;
+
+        zmp_max_Lpy_mpc_(i) = (1 - foot_step_(current_step_num_mpc_, 6))*foot_step_support_frame_mpc_(current_step_num_mpc_, 1)
+                            +      foot_step_(current_step_num_mpc_, 6) *foot_step_support_frame_mpc_(min(current_step_num_mpc_ + 1, total_step_num_), 1)
+                            + zmp_y_max;
+
+        zmp_max_Rpy_mpc_(i) =      foot_step_(current_step_num_mpc_, 6) *foot_step_support_frame_mpc_(current_step_num_mpc_, 1)
+                            + (1 - foot_step_(current_step_num_mpc_, 6))*foot_step_support_frame_mpc_(min(current_step_num_mpc_ + 1, total_step_num_), 1)
+                            + zmp_y_max;
+
+        zmp_min_y_mpc_(i)   = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1),1) - zmp_y_min;
     }
 
+    if(current_step_num_mpc_ == 0) { zmp_max_Lpy_mpc_ = zmp_max_Lpy_mpc_ - 0.02*MatrixXd::Ones(N_plan_mpc, 1); }
+    if(current_step_num_mpc_ == 1) { zmp_max_Rpy_mpc_ = zmp_max_Rpy_mpc_ + 0.01*MatrixXd::Ones(N_plan_mpc, 1); }
+    
+    zmp_min_Lpy_mpc_ = zmp_max_Lpy_mpc_ - 2*zmp_y_min*MatrixXd::Ones(N_plan_mpc, 1);
+    zmp_min_Rpy_mpc_ = zmp_max_Rpy_mpc_ - 2*zmp_y_min*MatrixXd::Ones(N_plan_mpc, 1);
+
     //Z direction
+    gcalc_plan_mpc_.setZero(N_plan_mpc, N_plan_mpc);
     gcalc_plan_mpc_ = gzcalc_plan_mpc_*(Pcps_plan_mpc_*ssz_plan_mpc_*MPC_Planner_state_mpc_ - Pv_z_ref);
 
-    QP_MPC_Planner_.EnableEqualityCondition(equality_condition_eps_);
-    QP_MPC_Planner_.UpdateMinProblem(Qzcalc_plan_mpc_, gcalc_plan_mpc_);
-    QP_MPC_Planner_.DeleteSubjectToAx();
-    QP_MPC_Planner_.DeleteSubjectToX();
+    QP_MPC_Planner_Z_.EnableEqualityCondition(equality_condition_eps_);
+    QP_MPC_Planner_Z_.UpdateMinProblem(Qzcalc_plan_mpc_, gcalc_plan_mpc_);
+    QP_MPC_Planner_Z_.DeleteSubjectToAx();
+    QP_MPC_Planner_Z_.DeleteSubjectToX();
 
     const_A_mpc_.setZero(N_plan_mpc, N_plan_mpc);
     const_ub_mpc_.setZero(N_plan_mpc, 1);
     const_lb_mpc_.setZero(N_plan_mpc, 1);
 
-    QP_MPC_Planner_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
+    QP_MPC_Planner_Z_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
 
-    if(QP_MPC_Planner_.SolveQPoases(100, MPC_Planner_u_mpc_))
+    if(QP_MPC_Planner_Z_.SolveQPoases(100, MPC_Planner_u_mpc_z_))
     {
         if((walking_tick_mpc_ - mpc_synchro_hz - 20)%int(2*hz_) == 0)
         { cout << "VHIPM Planner SQ MPC Z direction Solved" << endl; }
         
-        Planner_State_Prev_mpc_.row(6).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(7).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(8).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_;
+        Planner_State_Prev_mpc_.row(6).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_z_;
+        Planner_State_Prev_mpc_.row(7).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_z_;
+        Planner_State_Prev_mpc_.row(8).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_z_;
 
-        MPC_Planner_state_mpc_.segment(6,3) = A_mpc_*MPC_Planner_state_mpc_.segment(6,3) + B_mpc_*MPC_Planner_u_mpc_(0);
+        MPC_Planner_state_mpc_.segment(6,3) = A_mpc_*MPC_Planner_state_mpc_.segment(6,3) + B_mpc_*MPC_Planner_u_mpc_z_(0);
     }
     else
     { 
         cout << "VHIPM Planner SQ MPC Z direction Not Solved" << endl;
         cout << int(walking_tick_mpc_ - 20)/mpc_synchro_hz << endl;
         
-        Planner_State_Prev_mpc_.row(6).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(7).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(8).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_;
+        Planner_State_Prev_mpc_.row(6).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_z_;
+        Planner_State_Prev_mpc_.row(7).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_z_;
+        Planner_State_Prev_mpc_.row(8).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_z_;
 
-        MPC_Planner_state_mpc_.segment(6,3) = A_mpc_*MPC_Planner_state_mpc_.segment(6,3) + B_mpc_*MPC_Planner_u_mpc_(0);
+        MPC_Planner_state_mpc_.segment(6,3) = A_mpc_*MPC_Planner_state_mpc_.segment(6,3) + B_mpc_*MPC_Planner_u_mpc_z_(0);
     }
 
-    MPC_SQ_Planner_u_mpc_(2) = MPC_Planner_u_mpc_(0);
+    MPC_SQ_Planner_u_mpc_(2) = MPC_Planner_u_mpc_z_(0);
 
     //X,Y setting
     Eigen::MatrixXd prev_zmp; prev_zmp.setZero(2, N_plan_mpc);
@@ -8784,103 +8816,178 @@ void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, 
     }
 
     //X direction
-    Qxcalc_plan_mpc_ = Pvpu_plan_mpc_.transpose()*wpvx*Qmat_plan_mpc_*Pvpu_plan_mpc_ + wdvx*Qmat_plan_mpc_;
-    gxcalc_plan_mpc_ = Pvpu_plan_mpc_.transpose()*wpvx*Qmat_plan_mpc_;
+    gcalc_plan_mpc_.setZero(4*N_plan_mpc, N_plan_mpc);
+    Qxcalc_plan_mpc_ = SUp_plan_mpc_.transpose()*(Pvpu_plan_mpc_.transpose()*wpvx*Qmat_plan_mpc_*Pvpu_plan_mpc_ + wdvx*Qmat_plan_mpc_)*SUp_plan_mpc_;
+    gxcalc_plan_mpc_ = SUp_plan_mpc_.transpose()* Pvpu_plan_mpc_.transpose()*wpvx*Qmat_plan_mpc_;
     gcalc_plan_mpc_ = gxcalc_plan_mpc_*(Pvps_plan_mpc_*ssx_plan_mpc_*MPC_Planner_state_mpc_ - Pv_x_ref);
 
-    QP_MPC_Planner_.EnableEqualityCondition(equality_condition_eps_);
-    QP_MPC_Planner_.UpdateMinProblem(Qxcalc_plan_mpc_, gcalc_plan_mpc_);
-    QP_MPC_Planner_.DeleteSubjectToAx();
-    QP_MPC_Planner_.DeleteSubjectToX();
+    QP_MPC_Planner_X_.EnableEqualityCondition(equality_condition_eps_);
+    QP_MPC_Planner_X_.UpdateMinProblem(Qxcalc_plan_mpc_, gcalc_plan_mpc_);
+    QP_MPC_Planner_X_.DeleteSubjectToAx();
+    QP_MPC_Planner_X_.DeleteSubjectToX();
 
-    const_A_mpc_.setZero(N_plan_mpc, N_plan_mpc);
-    const_ub_mpc_.setZero(N_plan_mpc, 1);
-    const_lb_mpc_.setZero(N_plan_mpc, 1);
+    const_A_mpc_.setZero( 10*N_plan_mpc, 4*N_plan_mpc);
+    const_ub_mpc_.setZero(10*N_plan_mpc, 1);
+    const_lb_mpc_.setZero(10*N_plan_mpc, 1);
 
-    QP_MPC_Planner_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
+    //zmp const
+    const_A_mpc_.block( 0*N_plan_mpc, 0, N_plan_mpc, 4*N_plan_mpc) = Pvpu_plan_mpc_*SUp_plan_mpc_;
+    const_ub_mpc_.block(0*N_plan_mpc, 0, N_plan_mpc, 1) = zmp_max_x_mpc_ - Pvps_plan_mpc_*ssx_plan_mpc_*MPC_Planner_state_mpc_;
+    const_lb_mpc_.block(0*N_plan_mpc, 0, N_plan_mpc, 1) = zmp_min_x_mpc_ - Pvps_plan_mpc_*ssx_plan_mpc_*MPC_Planner_state_mpc_;
 
-    if(QP_MPC_Planner_.SolveQPoases(100, MPC_Planner_u_mpc_))
+    QP_MPC_Planner_X_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
+
+    if(QP_MPC_Planner_X_.SolveQPoases(100, MPC_Planner_u_mpc_x_))
     {
         if((walking_tick_mpc_ - mpc_synchro_hz - 20)%int(2*hz_) == 0)
         { cout << "VHIPM Planner SQ MPC X direction Solved" << endl; }
-        
-        Planner_State_Prev_mpc_.row(0).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(1).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(2).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_;
 
-        MPC_Planner_state_mpc_.segment(0,3) = A_mpc_*MPC_Planner_state_mpc_.segment(0,3) + B_mpc_*MPC_Planner_u_mpc_(0);
+        Planner_State_Prev_mpc_.row(0).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_x_.segment(0, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(1).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_x_.segment(0, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(2).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_x_.segment(0, N_plan_mpc);
+
+        MPC_Planner_state_mpc_.segment(0,3) = A_mpc_*MPC_Planner_state_mpc_.segment(0,3) + B_mpc_*MPC_Planner_u_mpc_x_(0);
     }
     else
     { 
         cout << "VHIPM Planner SQ MPC X direction Not Solved" << endl;
         cout << int(walking_tick_mpc_ - 20)/mpc_synchro_hz << endl;
         
-        Planner_State_Prev_mpc_.row(0).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(1).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(2).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_;
+        Planner_State_Prev_mpc_.row(0).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_x_.segment(0, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(1).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_x_.segment(0, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(2).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_x_.segment(0, N_plan_mpc);
 
-        MPC_Planner_state_mpc_.segment(0,3) = A_mpc_*MPC_Planner_state_mpc_.segment(0,3) + B_mpc_*MPC_Planner_u_mpc_(0);
+        MPC_Planner_state_mpc_.segment(0,3) = A_mpc_*MPC_Planner_state_mpc_.segment(0,3) + B_mpc_*MPC_Planner_u_mpc_x_(0);
     }
 
-    MPC_SQ_Planner_u_mpc_(0) = MPC_Planner_u_mpc_(0);
+    MPC_SQ_Planner_u_mpc_(0) = MPC_Planner_u_mpc_x_(0);
 
     //Y direction
-    Qycalc_plan_mpc_ = Pvpu_plan_mpc_.transpose()*wpvy*Qmat_plan_mpc_*Pvpu_plan_mpc_ + wdvy*Qmat_plan_mpc_;
-    gycalc_plan_mpc_ = Pvpu_plan_mpc_.transpose()*wpvy*Qmat_plan_mpc_;
-    gcalc_plan_mpc_ = gycalc_plan_mpc_*(Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_ - Pv_y_ref);
+    gcalc_plan_mpc_.setZero(4*N_plan_mpc, N_plan_mpc);
+    Qycalc_plan_mpc_ = SUp_plan_mpc_.transpose()*(Pvpu_plan_mpc_.transpose()*wpvy*Qmat_plan_mpc_*Pvpu_plan_mpc_ + wdvy*Qmat_plan_mpc_)*SUp_plan_mpc_
+                     + SUplp_plan_mpc_.transpose()*wplvy*Qmat_plan_mpc_*SUplp_plan_mpc_
+                     + SUprp_plan_mpc_.transpose()*wprvy*Qmat_plan_mpc_*SUprp_plan_mpc_;
+    gycalc_plan_mpc_ = SUp_plan_mpc_.transpose()* Pvpu_plan_mpc_.transpose()*wpvy*Qmat_plan_mpc_;
+    gcalc_plan_mpc_  = gycalc_plan_mpc_*(Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_ - Pv_y_ref)
+                     + SUplp_plan_mpc_.transpose()*wplvy*Qmat_plan_mpc_*( - 0.5*(zmp_max_Lpy_mpc_ + zmp_min_Lpy_mpc_ - 0.04*MatrixXd::Ones(N_plan_mpc, 1)))
+                     + SUprp_plan_mpc_.transpose()*wprvy*Qmat_plan_mpc_*( - 0.5*(zmp_max_Rpy_mpc_ + zmp_min_Rpy_mpc_ + 0.04*MatrixXd::Ones(N_plan_mpc, 1)));
 
-    QP_MPC_Planner_.EnableEqualityCondition(equality_condition_eps_);
-    QP_MPC_Planner_.UpdateMinProblem(Qycalc_plan_mpc_, gcalc_plan_mpc_);
-    QP_MPC_Planner_.DeleteSubjectToAx();
-    QP_MPC_Planner_.DeleteSubjectToX();
+    deldelQcalc_plan_mpc_ = Qycalc_plan_mpc_;
+    delgcalc_plan_mpc_ = Qycalc_plan_mpc_*MPC_Planner_u_mpc_y_ + gcalc_plan_mpc_;
 
-    const_A_mpc_.setZero(N_plan_mpc, N_plan_mpc);
-    const_A_mpc_ = Pvpu_plan_mpc_;
-    const_ub_mpc_.setZero(N_plan_mpc, 1);
-    const_ub_mpc_ = zmp_max_y_mpc_ - Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_;
-    const_lb_mpc_.setZero(N_plan_mpc, 1);
-    const_lb_mpc_ = zmp_min_y_mpc_ - Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_;
+    QP_MPC_Planner_Y_.EnableEqualityCondition(equality_condition_eps_);
+    //QP_MPC_Planner_Y_.UpdateMinProblem(Qycalc_plan_mpc_, gcalc_plan_mpc_);
+    QP_MPC_Planner_Y_.UpdateMinProblem(deldelQcalc_plan_mpc_, delgcalc_plan_mpc_);
+    QP_MPC_Planner_Y_.DeleteSubjectToAx();
+    QP_MPC_Planner_Y_.DeleteSubjectToX();
 
-    QP_MPC_Planner_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
+    const_A_mpc_.setZero( 10*N_plan_mpc, 4*N_plan_mpc);
+    const_ub_mpc_.setZero(10*N_plan_mpc, 1);
+    const_lb_mpc_.setZero(10*N_plan_mpc, 1);
 
-    if(QP_MPC_Planner_.SolveQPoases(100, MPC_Planner_u_mpc_))
+    //zmp const
+    const_A_mpc_.block( 0*N_plan_mpc, 0, N_plan_mpc, 4*N_plan_mpc) = Pvpu_plan_mpc_*SUp_plan_mpc_;
+    const_ub_mpc_.block(0*N_plan_mpc, 0, N_plan_mpc, 1) = - Pvpu_plan_mpc_*SUp_plan_mpc_*MPC_Planner_u_mpc_y_ + zmp_max_y_mpc_ - Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_;
+    const_lb_mpc_.block(0*N_plan_mpc, 0, N_plan_mpc, 1) = - Pvpu_plan_mpc_*SUp_plan_mpc_*MPC_Planner_u_mpc_y_ + zmp_min_y_mpc_ - Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_;
+
+    //lzmp rzmp sum
+    const_SQP_Phi_mpc_.setZero(4*N_plan_mpc, 4*N_plan_mpc);
+    const_SQP_Phi_mpc_calc_.setZero(4*N_plan_mpc, 4*N_plan_mpc);
+    const_SQP_Pi_mpc_.setZero( 4*N_plan_mpc, 1);
+    const_SQP_ri_mpc_.setZero(            1, 1);
+
+    for(int i = 0; i < N_plan_mpc; i++)
+    {
+        const_SQP_Phi_mpc_      = SUpa_plan_mpc_.row(i).transpose()*(SUprp_plan_mpc_ - SUplp_plan_mpc_).row(i);
+        const_SQP_Phi_mpc_calc_ = 0.5*(const_SQP_Phi_mpc_ + const_SQP_Phi_mpc_.transpose());
+        const_SQP_Pi_mpc_       = (Pvpu_plan_mpc_*SUp_plan_mpc_ - SUprp_plan_mpc_).row(i).transpose();
+        const_SQP_ri_mpc_       = Pvps_plan_mpc_.row(i)*ssy_plan_mpc_*MPC_Planner_state_mpc_;
+
+        const_SQP_hi_mpc_       = MPC_Planner_u_mpc_y_.transpose()*const_SQP_Phi_mpc_*MPC_Planner_u_mpc_y_ 
+                                + const_SQP_Pi_mpc_.transpose()*MPC_Planner_u_mpc_y_
+                                + const_SQP_ri_mpc_;
+        
+        const_A_mpc_.row( 1*N_plan_mpc + i) = (2*const_SQP_Phi_mpc_calc_*MPC_Planner_u_mpc_y_ + const_SQP_Pi_mpc_).transpose();
+        const_ub_mpc_.row(1*N_plan_mpc + i) = - const_SQP_hi_mpc_;
+        const_lb_mpc_.row(1*N_plan_mpc + i) = -1e+3*MatrixXd::Identity(1,1);
+    }
+
+    ////alpha const
+    const_A_mpc_.block( 6*N_plan_mpc, 0, N_plan_mpc, 4*N_plan_mpc) = SUpa_plan_mpc_;
+    const_ub_mpc_.block(6*N_plan_mpc, 0, N_plan_mpc, 1)            = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Ones(N_plan_mpc, 1);
+    const_lb_mpc_.block(6*N_plan_mpc, 0, N_plan_mpc, 1)            = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Zero(N_plan_mpc, 1);
+
+    if(walking_tick_mpc_ > t_temp_)
+    {
+        if(walking_tick_mpc_ > t_start_mpc_ + t_double1_ + t_rest_init_ - hz_/thread3_hz_)
+        {
+            if(walking_tick_mpc_ < t_start_mpc_ + t_total_ - t_double2_ - t_rest_last_ - hz_/thread3_hz_)
+            {
+                if(foot_step_(current_step_num_mpc_, 6) == 0)
+                {
+                    const_ub_mpc_.block(6*N_plan_mpc, 0, N_plan_mpc, 1) = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Zero(N_plan_mpc, 1);
+                    const_lb_mpc_.block(6*N_plan_mpc, 0, N_plan_mpc, 1) = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Zero(N_plan_mpc, 1);
+                }
+                else
+                {
+                    const_ub_mpc_.block(6*N_plan_mpc, 0, N_plan_mpc, 1) = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Ones(N_plan_mpc, 1);
+                    const_lb_mpc_.block(6*N_plan_mpc, 0, N_plan_mpc, 1) = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Ones(N_plan_mpc, 1);
+                }
+            }
+        }
+    }
+
+
+    QP_MPC_Planner_Y_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
+
+    if(QP_MPC_Planner_Y_.SolveQPoases(100, MPC_Planner_delu_mpc_y_))
     {
         if((walking_tick_mpc_ - mpc_synchro_hz - 20)%int(2*hz_) == 0)
         { cout << "VHIPM Planner SQ MPC Y direction Solved" << endl << endl; }
         
-        Planner_State_Prev_mpc_.row(3).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(4).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(5).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_;
-        
-        prev_zmp.row(1).transpose()                = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_;
+        MPC_Planner_u_mpc_y_ = MPC_Planner_u_mpc_y_ + MPC_Planner_delu_mpc_y_;
 
-        MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*MPC_Planner_u_mpc_(0);
+        Planner_State_Prev_mpc_.row(3).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(4).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(5).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+        
+        prev_zmp.row(1).transpose()                = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+
+        MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*MPC_Planner_u_mpc_y_(0);
     }
     else
     { 
         cout << "VHIPM Planner SQ MPC Y direction Not Solved" << endl << endl;
         cout << int(walking_tick_mpc_ - 20)/mpc_synchro_hz << endl;
         
-        Planner_State_Prev_mpc_.row(3).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(4).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(5).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_;
+        MPC_Planner_u_mpc_y_ = MPC_Planner_u_mpc_y_;
 
-        prev_zmp.row(1).transpose()                = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_;
+        Planner_State_Prev_mpc_.row(3).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(4).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(5).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+        
+        prev_zmp.row(1).transpose()                = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
 
-        MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*MPC_Planner_u_mpc_(0);
+        MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*MPC_Planner_u_mpc_y_(0);
     }
 
-    MPC_SQ_Planner_u_mpc_(1) = MPC_Planner_u_mpc_(0);
+    MPC_SQ_Planner_u_mpc_(1) = MPC_Planner_u_mpc_y_(0);
 
     Cvp_mpc_ << 1, 0, - Planner_State_Prev_mpc_(6,0)/(Planner_State_Prev_mpc_(8,0) + GRAVITY);
 
+    double alpha = MPC_Planner_u_mpc_y_(1*N_plan_mpc);
+    double lzmp  = MPC_Planner_u_mpc_y_(2*N_plan_mpc);
+    double rzmp  = MPC_Planner_u_mpc_y_(3*N_plan_mpc);
+
     e_qcqp_gurobi_graph << setprecision(10)
-                        << Pv_x_ref(0)               << "," << Pv_y_ref(0)               << "," << Pv_z_ref(0)               <<","
-                        << MPC_Planner_state_mpc_(0) << "," << MPC_Planner_state_mpc_(3) << "," << MPC_Planner_state_mpc_(6) <<","
-                        << MPC_Planner_state_mpc_(1) << "," << MPC_Planner_state_mpc_(4) << "," << MPC_Planner_state_mpc_(7) <<","
-                        << MPC_Planner_state_mpc_(2) << "," << MPC_Planner_state_mpc_(5) << "," << MPC_Planner_state_mpc_(8) <<","
-                        << zmp_max_x_mpc_(0)         << "," << zmp_max_y_mpc_(0)         << "," << 0                         <<","
-                        << prev_zmp(0,0)             << "," << prev_zmp(1,0)             << "," << 0                         << ","
+                        << Pv_x_ref(0)               << "," << Pv_y_ref(0)               << "," << Pv_z_ref(0)               << ","
+                        << MPC_Planner_state_mpc_(0) << "," << MPC_Planner_state_mpc_(3) << "," << MPC_Planner_state_mpc_(6) << ","
+                        << MPC_Planner_state_mpc_(1) << "," << MPC_Planner_state_mpc_(4) << "," << MPC_Planner_state_mpc_(7) << ","
+                        << MPC_Planner_state_mpc_(2) << "," << MPC_Planner_state_mpc_(5) << "," << MPC_Planner_state_mpc_(8) << ","
+                        << zmp_max_x_mpc_(0)         << "," << zmp_max_y_mpc_(0)         << "," << 0                         << ","
+                        << prev_zmp(0,0)             << "," << prev_zmp(1,0)             << "," << alpha                     << ","
+                        << zmp_max_Lpy_mpc_(0)       << "," << zmp_min_Lpy_mpc_(0)       << "," << lzmp                      << ","
+                        << zmp_max_Rpy_mpc_(0)       << "," << zmp_min_Rpy_mpc_(0)       << "," << rzmp                      << ","
                         << endl;
 }
 
