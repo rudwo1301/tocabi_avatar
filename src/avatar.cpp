@@ -702,7 +702,7 @@ void AvatarController::computeSlow()
         {
             torque_sum(i) = DyrosMath::minmax_cut(torque_sum(i), -rd_.torque_limit(i), rd_.torque_limit(i));
         }
-        e_tmp_graph2 << torque_sum.transpose() << endl;
+
         torque_desired_prev_ = torque_sum;
 
         rd_.torque_desired = torque_sum;
@@ -5485,6 +5485,9 @@ void AvatarController::computeThread3()
 
         ref_com_z_mpc_                      = ref_com_z_container_to_mpc_;
 
+        ref_lzmp_mpc_                       = ref_lzmp_container_to_mpc_;
+        ref_rzmp_mpc_                       = ref_rzmp_container_to_mpc_;
+
         dcm_measured_mpc_                   = dcm_measured_container_to_mpc_;
         com_measured_mpc_                   = com_measured_container_to_mpc_;
         com_dot_measured_mpc_               = com_dot_measured_container_to_mpc_;
@@ -5512,6 +5515,12 @@ void AvatarController::computeThread3()
 
         current_step_num_container_from_mpc_               = current_step_num_mpc_;
 
+        MPC_Planner_alpha_container_from_mpc_              = MPC_Planner_alpha_mpc_;
+
+        MPC_Planner_lzmp_container_from_mpc_               = MPC_Planner_lzmp_mpc_;
+
+        MPC_Planner_rzmp_container_from_mpc_               = MPC_Planner_rzmp_mpc_;
+
         atb_mpc_to_main_update_ = false;
     }
     mpc_update_ = true;
@@ -5524,6 +5533,14 @@ void AvatarController::computeThread3()
 
 void AvatarController::econom2_thread_stepchange()
 {
+    Eigen::Vector2d del_F_mpc; del_F_mpc.setZero();
+
+    if((current_step_num_mpc_ == 2) && (walking_tick_mpc_ > t_start_mpc_ + 0.7*t_total_))
+    {
+        del_F_mpc(1) = - 0.1;
+    }
+    foot_step_support_frame_mpc_(current_step_num_mpc_, 0) += del_F_mpc(0);
+    foot_step_support_frame_mpc_(current_step_num_mpc_, 1) += del_F_mpc(1);
     if((walking_tick_mpc_ - (t_start_mpc_ + t_total_const_) >= -hz_/thread3_hz_) && (current_step_num_mpc_ < total_step_num_ - 1))
     {
         Eigen::Vector3d var_after_step_change, var_before_step_change, frame_pos_diff;
@@ -5568,6 +5585,8 @@ void AvatarController::econom2_thread_stepchange()
         MPC_Planner_state_mpc_(5) = var_after_step_change(1);
         MPC_Planner_state_mpc_(8) = var_after_step_change(2);
     }
+    foot_step_support_frame_mpc_(current_step_num_mpc_, 0) -= del_F_mpc(0);
+    foot_step_support_frame_mpc_(current_step_num_mpc_, 1) -= del_F_mpc(1);
 }
 
 void AvatarController::savePreData()
@@ -7333,21 +7352,31 @@ void AvatarController::getZmpTrajectory()
 
     addZmpOffset(); 
 
-    foot_step_support_frame_.block(current_step_num_, 0, 1, 2)        += del_F_.transpose();
-    foot_step_support_frame_offset_.block(current_step_num_, 0, 1, 2) += del_F_.transpose();
+    if(walking_tick_ - t_start_ < t_double1_ + t_rest_init_)
+    {
+        foot_step_support_frame_.       block(max(current_step_num_ - 2, 0), 0, 1, 2) -= del_F_prev_.transpose();
+        foot_step_support_frame_offset_.block(max(current_step_num_ - 2, 0), 0, 1, 2) -= del_F_prev_.transpose();
+    }
+    foot_step_support_frame_.           block(            current_step_num_, 0, 1, 2) += del_F_.transpose();
+    foot_step_support_frame_offset_.    block(            current_step_num_, 0, 1, 2) += del_F_.transpose();
     zmpGenerator_wComZ_e(planning_zmp_size, planning_step_number);
-    foot_step_support_frame_.block(current_step_num_, 0, 1, 2)        -= del_F_.transpose(); 
-    foot_step_support_frame_offset_.block(current_step_num_, 0, 1, 2) -= del_F_.transpose();
+    foot_step_support_frame_.           block(            current_step_num_, 0, 1, 2) -= del_F_.transpose(); 
+    foot_step_support_frame_offset_.    block(            current_step_num_, 0, 1, 2) -= del_F_.transpose();
+    if(walking_tick_ - t_start_ < t_double1_ + t_rest_init_)
+    {
+        foot_step_support_frame_.       block(max(current_step_num_ - 2, 0), 0, 1, 2) += del_F_prev_.transpose();
+        foot_step_support_frame_offset_.block(max(current_step_num_ - 2, 0), 0, 1, 2) += del_F_prev_.transpose();
+    }
 
     zmp_desired_(0) = ref_zmp_(walking_tick_ - (bool)current_step_num_*t_start_,0);
     zmp_desired_(1) = ref_zmp_(walking_tick_ - (bool)current_step_num_*t_start_,1);
 
     ref_zmp_wo_offset_mpc_.resize(planning_zmp_size, 2);
-    ref_zmp_mpc_.resize(planning_zmp_size, 2);
-    ref_zmp_container_to_mpc_.resize(planning_zmp_size, 2);
+    ref_zmp_mpc_.          resize(planning_zmp_size, 2);
+    ref_lzmp_mpc_.         resize(planning_zmp_size, 2);
+    ref_rzmp_mpc_.         resize(planning_zmp_size, 2);
 
-    ref_com_z_mpc_.resize(planning_zmp_size, 1);
-    ref_com_z_container_to_mpc_.resize(planning_zmp_size, 1);
+    ref_com_z_mpc_.        resize(planning_zmp_size, 1);
 }
 
 void AvatarController::zmpGenerator_wComZ_e(const unsigned int norm_size, const unsigned planning_step_num)
@@ -7356,18 +7385,23 @@ void AvatarController::zmpGenerator_wComZ_e(const unsigned int norm_size, const 
     ref_com_z_.setZero(norm_size, 1);
     ref_zmp_wo_offset_.setZero(norm_size, 2);
 
+    ref_lzmp_.setZero(norm_size, 2);
+    ref_rzmp_.setZero(norm_size, 2);
+
     Eigen::VectorXd temp_px,           temp_py;
     Eigen::VectorXd temp_px_wo_offset, temp_py_wo_offset;
     Eigen::VectorXd temp_cz;
+    Eigen::VectorXd temp_lpx,          temp_lpy;
+    Eigen::VectorXd temp_rpx,          temp_rpy;
 
     unsigned int index = 0;
     double t_total_zmp = t_total_;
 
     if (current_step_num_ == 0)  
     {
-        ref_zmp_.block(0, 0, 1.0*hz_, 1).setConstant(com_support_init_(0));
-        ref_zmp_.block(0, 1, 1.0*hz_, 1).setConstant(com_support_init_(1));
-        ref_com_z_.block(0, 0, 1.0*hz_, 1).setConstant(zc_mj_);
+        ref_zmp_.          block(0, 0, 1.0*hz_, 1).setConstant(com_support_init_(0));
+        ref_zmp_.          block(0, 1, 1.0*hz_, 1).setConstant(com_support_init_(1));
+        ref_com_z_.        block(0, 0, 1.0*hz_, 1).setConstant(zc_mj_);
 
         ref_zmp_wo_offset_.block(0, 0, 1.0*hz_, 1).setConstant(com_support_init_(0));
         ref_zmp_wo_offset_.block(0, 1, 1.0*hz_, 1).setConstant(com_support_init_(1));
@@ -7395,6 +7429,12 @@ void AvatarController::zmpGenerator_wComZ_e(const unsigned int norm_size, const 
         ref_zmp_wo_offset_.block(2.0*hz_, 0, t_temp_ - 2.0*hz_, 1).setConstant(0.0);
         ref_zmp_wo_offset_.block(2.0*hz_, 1, t_temp_ - 2.0*hz_, 1).setConstant(com_support_init_(1));
 
+        ref_lzmp_.         block(0, 0, t_temp_, 1).setConstant(com_support_init_(0));
+        ref_lzmp_.         block(0, 1, t_temp_, 1).setConstant(0.0);
+
+        ref_rzmp_.         block(0, 0, t_temp_, 1).setConstant(com_support_init_(0));
+        ref_rzmp_.         block(0, 1, t_temp_, 1).setConstant(2*com_support_init_(1));
+
         index = index + t_temp_ - 2.0*hz_;
     }
     /////////////////////////////////////////////////////////////////////.
@@ -7403,28 +7443,41 @@ void AvatarController::zmpGenerator_wComZ_e(const unsigned int norm_size, const 
     {   
         for(unsigned int i = current_step_num_; i < total_step_num_; i++)
         {   
-            onestepZmp_wo_offset(i, t_total_zmp, temp_px, temp_py, temp_px_wo_offset, temp_py_wo_offset);
-            onestepComZ(i, t_total_zmp, temp_cz);
+            onestepZmp_wo_offset(i, t_total_zmp, temp_px,  temp_py,  temp_px_wo_offset, temp_py_wo_offset);
+            onestepComZ         (i, t_total_zmp, temp_cz);
+            onestepZmp_LR       (i, t_total_zmp, temp_lpx, temp_rpx, temp_lpy,          temp_rpy);
 
-            ref_zmp_.block(index, 0, t_total_zmp, 1) = temp_px.block(0, 0, t_total_zmp, 1);
-            ref_zmp_.block(index, 1, t_total_zmp, 1) = temp_py.block(0, 0, t_total_zmp, 1);
+            ref_zmp_.          block(index, 0, t_total_zmp, 1) = temp_px.          block(0, 0, t_total_zmp, 1);
+            ref_zmp_.          block(index, 1, t_total_zmp, 1) = temp_py.          block(0, 0, t_total_zmp, 1);
 
-            ref_com_z_.block(index, 0, t_total_zmp, 1) = temp_cz.block(0, 0, t_total_zmp, 1);
+            ref_com_z_.        block(index, 0, t_total_zmp, 1) = temp_cz.          block(0, 0, t_total_zmp, 1);
 
             ref_zmp_wo_offset_.block(index, 0, t_total_zmp, 1) = temp_px_wo_offset.block(0, 0, t_total_zmp, 1);
             ref_zmp_wo_offset_.block(index, 1, t_total_zmp, 1) = temp_py_wo_offset.block(0, 0, t_total_zmp, 1);
 
+            ref_lzmp_.         block(index, 0, t_total_zmp, 1) = temp_lpx.         block(0, 0, t_total_zmp, 1);
+            ref_lzmp_.         block(index, 1, t_total_zmp, 1) = temp_lpy.         block(0, 0, t_total_zmp, 1);
+
+            ref_rzmp_.         block(index, 0, t_total_zmp, 1) = temp_rpx.         block(0, 0, t_total_zmp, 1);
+            ref_rzmp_.         block(index, 1, t_total_zmp, 1) = temp_rpy.         block(0, 0, t_total_zmp, 1);
+
             index = index + t_total_zmp;
         }
 
-        ref_zmp_.block(index, 0, 3.0 * hz_, 1).setConstant(ref_zmp_(index - 1,0));
-        ref_zmp_.block(index, 1, 3.0 * hz_, 1).setConstant(ref_zmp_(index - 1,1));
+        ref_zmp_.          block(index, 0, 3.0 * hz_, 1).setConstant(ref_zmp_          (index - 1, 0));
+        ref_zmp_.          block(index, 1, 3.0 * hz_, 1).setConstant(ref_zmp_          (index - 1, 1));
 
-        ref_com_z_.block(index, 0, 3.0 * hz_, 1).setConstant(ref_com_z_(index - 1,0));
+        ref_com_z_.        block(index, 0, 3.0 * hz_, 1).setConstant(ref_com_z_        (index - 1, 0));
 
-        ref_zmp_wo_offset_.block(index, 0, 3.0 * hz_, 1).setConstant(ref_zmp_wo_offset_(index - 1,0));
-        ref_zmp_wo_offset_.block(index, 1, 3.0 * hz_, 1).setConstant(ref_zmp_wo_offset_(index - 1,1));
+        ref_zmp_wo_offset_.block(index, 0, 3.0 * hz_, 1).setConstant(ref_zmp_wo_offset_(index - 1, 0));
+        ref_zmp_wo_offset_.block(index, 1, 3.0 * hz_, 1).setConstant(ref_zmp_wo_offset_(index - 1, 1));
 
+        ref_lzmp_.         block(index, 0, 3.0 * hz_, 1).setConstant(ref_lzmp_         (index - 1, 0));
+        ref_lzmp_.         block(index, 1, 3.0 * hz_, 1).setConstant(ref_lzmp_         (index - 1, 1));
+
+        ref_rzmp_.         block(index, 0, 3.0 * hz_, 1).setConstant(ref_rzmp_         (index - 1, 0));
+        ref_rzmp_.         block(index, 1, 3.0 * hz_, 1).setConstant(ref_rzmp_         (index - 1, 1));
+        
         index = index + 3.0 * hz_; // Norm size must be larger than this addtional zmp size.
     }
     else // reference ZMP during walking
@@ -7432,15 +7485,22 @@ void AvatarController::zmpGenerator_wComZ_e(const unsigned int norm_size, const 
         for (unsigned int i = current_step_num_; i < current_step_num_ + planning_step_num; i++)
         {   
             onestepZmp_wo_offset(i, t_total_zmp, temp_px, temp_py, temp_px_wo_offset, temp_py_wo_offset); // temp px, py에 1 step의 ZMP를 planning step num 번 담는다.
-            onestepComZ(i, t_total_zmp, temp_cz);
+            onestepComZ         (i, t_total_zmp, temp_cz);
+            onestepZmp_LR       (i, t_total_zmp, temp_lpx, temp_rpx, temp_lpy,          temp_rpy);
 
-            ref_zmp_.block(index, 0, t_total_zmp, 1) = temp_px.block(0, 0, t_total_zmp, 1);
-            ref_zmp_.block(index, 1, t_total_zmp, 1) = temp_py.block(0, 0, t_total_zmp, 1);
+            ref_zmp_.          block(index, 0, t_total_zmp, 1) = temp_px.          block(0, 0, t_total_zmp, 1);
+            ref_zmp_.          block(index, 1, t_total_zmp, 1) = temp_py.          block(0, 0, t_total_zmp, 1);
 
-            ref_com_z_.block(index, 0, t_total_zmp, 1) = temp_cz.block(0, 0, t_total_zmp, 1);
+            ref_com_z_.        block(index, 0, t_total_zmp, 1) = temp_cz.          block(0, 0, t_total_zmp, 1);
 
             ref_zmp_wo_offset_.block(index, 0, t_total_zmp, 1) = temp_px_wo_offset.block(0, 0, t_total_zmp, 1);
             ref_zmp_wo_offset_.block(index, 1, t_total_zmp, 1) = temp_py_wo_offset.block(0, 0, t_total_zmp, 1);
+
+            ref_lzmp_.         block(index, 0, t_total_zmp, 1) = temp_lpx.         block(0, 0, t_total_zmp, 1);
+            ref_lzmp_.         block(index, 1, t_total_zmp, 1) = temp_lpy.         block(0, 0, t_total_zmp, 1);
+
+            ref_rzmp_.         block(index, 0, t_total_zmp, 1) = temp_rpx.         block(0, 0, t_total_zmp, 1);
+            ref_rzmp_.         block(index, 1, t_total_zmp, 1) = temp_rpy.         block(0, 0, t_total_zmp, 1);
 
             index = index + t_total_zmp;                                                 
         }
@@ -7659,6 +7719,46 @@ void AvatarController::onestepZmp_wo_offset(unsigned int current_step_number, do
                 }                
             }            
         }
+    }
+}
+
+void AvatarController::onestepZmp_LR(unsigned int current_step_number, double t_total_zmp, Eigen::VectorXd& temp_lpx, Eigen::VectorXd& temp_rpx, Eigen::VectorXd& temp_lpy, Eigen::VectorXd& temp_rpy)
+{
+    temp_lpx.setZero(t_total_zmp); temp_lpy.setZero(t_total_zmp);
+    temp_rpx.setZero(t_total_zmp); temp_rpy.setZero(t_total_zmp);
+
+    int current_step_num_int_calc = current_step_number;
+    if(foot_step_(current_step_number, 6) == 0) //rfoot support
+    {
+        temp_lpx.segment(0.0*t_total_zmp, 0.5*t_total_zmp).setConstant(foot_step_support_frame_(max(              0, current_step_num_int_calc - 2), 0));
+        temp_lpx.segment(0.5*t_total_zmp, 0.5*t_total_zmp).setConstant(foot_step_support_frame_(min(total_step_num_, current_step_num_int_calc + 0), 0));
+        temp_rpx.segment(0.0*t_total_zmp, 1.0*t_total_zmp).setConstant(foot_step_support_frame_(max(              0, current_step_num_int_calc - 1), 0));
+
+        temp_lpy.segment(0.0*t_total_zmp, 0.5*t_total_zmp).setConstant(foot_step_support_frame_(max(              0, current_step_num_int_calc - 2), 1));
+        temp_lpy.segment(0.5*t_total_zmp, 0.5*t_total_zmp).setConstant(foot_step_support_frame_(min(total_step_num_, current_step_num_int_calc + 0), 1));
+        temp_rpy.segment(0.0*t_total_zmp, 1.0*t_total_zmp).setConstant(foot_step_support_frame_(max(              0, current_step_num_int_calc - 1), 1));
+    }
+    else
+    {
+        temp_lpx.segment(0.0*t_total_zmp, 1.0*t_total_zmp).setConstant(foot_step_support_frame_(max(              0, current_step_num_int_calc - 1), 0));
+        temp_rpx.segment(0.0*t_total_zmp, 0.5*t_total_zmp).setConstant(foot_step_support_frame_(max(              0, current_step_num_int_calc - 2), 0));
+        temp_rpx.segment(0.5*t_total_zmp, 0.5*t_total_zmp).setConstant(foot_step_support_frame_(min(total_step_num_, current_step_num_int_calc + 0), 0));
+
+        temp_lpy.segment(0.0*t_total_zmp, 1.0*t_total_zmp).setConstant(foot_step_support_frame_(max(              0, current_step_num_int_calc - 1), 1));
+        temp_rpy.segment(0.0*t_total_zmp, 0.5*t_total_zmp).setConstant(foot_step_support_frame_(max(              0, current_step_num_int_calc - 2), 1));
+        temp_rpy.segment(0.5*t_total_zmp, 0.5*t_total_zmp).setConstant(foot_step_support_frame_(min(total_step_num_, current_step_num_int_calc + 0), 1));
+    }
+
+    if(current_step_number == 0)
+    {
+        temp_lpy.setZero();
+        temp_rpy.segment(0.0*t_total_zmp, 0.5*t_total_zmp).setConstant(2*com_support_init_(1));
+    }
+
+    if(current_step_number == 1)
+    {
+        temp_lpy.segment(0.0*t_total_zmp, 0.5*t_total_zmp).setConstant(supportfoot_support_init_(1));
+        temp_lpy.segment(0.5*t_total_zmp, 0.5*t_total_zmp).setConstant(foot_step_support_frame_(current_step_num_int_calc, 1));
     }
 }
 
@@ -8437,23 +8537,27 @@ void AvatarController::getComTrajectory_mpc()
     if(atb_main_to_mpc_update_ == false)
     {
         atb_main_to_mpc_update_ = true;
-        walking_tick_container_to_mpc_ = walking_tick_;
-        com_start_tick_container_to_mpc_ = com_start_tick_;
-        current_step_num_container_to_mpc_ = current_step_num_;
 
-        t_start_container_to_mpc_ = t_start_;
+        walking_tick_container_to_mpc_                   = walking_tick_;
+        com_start_tick_container_to_mpc_                 = com_start_tick_;
+        current_step_num_container_to_mpc_               = current_step_num_;
 
-        ref_zmp_container_to_mpc_ = ref_zmp_;
-        ref_zmp_wo_offset_container_to_mpc_ = ref_zmp_wo_offset_;
+        t_start_container_to_mpc_                        = t_start_;
 
-        ref_com_z_container_to_mpc_ = ref_com_z_;
+        ref_zmp_container_to_mpc_                        = ref_zmp_;
+        ref_zmp_wo_offset_container_to_mpc_              = ref_zmp_wo_offset_;
+
+        ref_com_z_container_to_mpc_                      = ref_com_z_;
+
+        ref_lzmp_container_to_mpc_                       = ref_lzmp_;
+        ref_rzmp_container_to_mpc_                       = ref_rzmp_;
         
-        dcm_measured_container_to_mpc_ = dcm_measured_;
-        com_measured_container_to_mpc_ = com_measured_;
-        com_dot_measured_container_to_mpc_ = com_dot_measured_;
+        dcm_measured_container_to_mpc_                   = dcm_measured_;
+        com_measured_container_to_mpc_                   = com_measured_;
+        com_dot_measured_container_to_mpc_               = com_dot_measured_;
 
         foot_step_support_frame_offset_container_to_mpc_ = foot_step_support_frame_offset_;
-        foot_step_support_frame_container_to_mpc_ = foot_step_support_frame_;
+        foot_step_support_frame_container_to_mpc_        = foot_step_support_frame_;
 
         atb_main_to_mpc_update_ = false;
     }
@@ -8479,6 +8583,12 @@ void AvatarController::getComTrajectory_mpc()
             }
 
             Planner_state_main_calc_             = MPC_Planner_state_main_;
+
+            MPC_Planner_alpha_main_              = MPC_Planner_alpha_container_from_mpc_;
+
+            MPC_Planner_lzmp_main_               = MPC_Planner_lzmp_container_from_mpc_;
+
+            MPC_Planner_rzmp_main_               = MPC_Planner_rzmp_container_from_mpc_;
 
             atb_mpc_to_main_update_     = false;
         }
@@ -8522,6 +8632,25 @@ void AvatarController::getComTrajectory_mpc()
     dcm_desired_(0) = Planner_state_main_calc_(0) + Planner_state_main_calc_(1)/w_;
     dcm_desired_(1) = Planner_state_main_calc_(3) + Planner_state_main_calc_(4)/w_;
     dcm_desired_(2) = Planner_state_main_calc_(6) + Planner_state_main_calc_(7)/w_;
+
+    del_F_(0) = 0.0;
+    del_F_(1) = 0.0;
+    if((current_step_num_ == 2) && (walking_tick_ > t_start_ + 0.5*t_total_))
+    {
+        del_F_(1) = - 0.1;
+        del_F_(1) = DyrosMath::cubic(walking_tick_, t_start_ + 0.5*t_total_, t_start_ + t_total_ - t_double2_ - t_rest_last_, 0.0, -0.1, 0.0, 0.0);
+    }
+
+    if(walking_tick_ == t_start_ + t_total_ - 1)
+    {
+        del_F_prev_ = del_F_;
+    }
+
+    //step change
+    if(current_step_num_ != total_step_num_ - 1)
+    {
+        foot_step_support_frame_.block(current_step_num_, 0, 1, 2) += del_F_.transpose();
+    }
 
     //step change
     if(walking_tick_ == t_start_ + t_total_ - 1 && current_step_num_ != total_step_num_ - 1)
@@ -8592,11 +8721,12 @@ void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, 
     double wpvx,  wpvy, wpvz;
     double wdvx,  wdvy, wdvz;
     double wplvy, wprvy;
+    double wdalp;
 
-    wpvx  = 1e+6; wpvy = 1e+6; wpvz = 1e+4;
-    wdvx  = 1e+0; wdvy = 1e+0; wdvz = 1e+0;
-    wplvy = 1e+2;
-    wprvy = 1e+2;
+    wpvx  = 1e+6; wpvy  = 1e+6;  wpvz  = 1e+4;
+    wdvx  = 1e+0; wdvy  = 1e+0;  wdvz  = 1e+0;
+    wplvy = 1e+1; wprvy = 1e+1;  wdalp = 0e+1;
+
 
     int mpc_tick = walking_tick_mpc_ - com_start_tick_mpc_;
     const int N_plan_mpc = mpc_preview_window*mpc_freq;
@@ -8688,8 +8818,8 @@ void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, 
         gzcalc_plan_mpc_.setZero(N_plan_mpc, N_plan_mpc);
         gzcalc_plan_mpc_ = Pcpu_plan_mpc_.transpose()*wpvz*Qmat_plan_mpc_;
 
-        QP_MPC_Planner_X_.InitializeProblemSize(4*N_plan_mpc, 10*N_plan_mpc);
-        QP_MPC_Planner_Y_.InitializeProblemSize(4*N_plan_mpc, 10*N_plan_mpc);
+        QP_MPC_Planner_X_.InitializeProblemSize(4*N_plan_mpc, 4*N_plan_mpc);
+        QP_MPC_Planner_Y_.InitializeProblemSize(4*N_plan_mpc, 4*N_plan_mpc);
         QP_MPC_Planner_Z_.InitializeProblemSize(N_plan_mpc, N_plan_mpc);
 
         SUp_plan_mpc_.setZero (N_plan_mpc, 4*N_plan_mpc);
@@ -8713,9 +8843,13 @@ void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, 
         zmp_min_x_mpc_.setZero(N_plan_mpc);
 
         zmp_max_y_mpc_.setZero(N_plan_mpc);
-        zmp_max_Lpy_mpc_.setZero(N_plan_mpc);
-        zmp_max_Rpy_mpc_.setZero(N_plan_mpc);
         zmp_min_y_mpc_.setZero(N_plan_mpc);
+        
+        zmp_max_Lpy_mpc_.setZero(N_plan_mpc);
+        zmp_min_Lpy_mpc_.setZero(N_plan_mpc);
+
+        zmp_max_Rpy_mpc_.setZero(N_plan_mpc);
+        zmp_min_Rpy_mpc_.setZero(N_plan_mpc);
 
         MPC_first_loop = 1;
         cout << "Initialization of VHIPM SQ Planner MPC is completed." << endl;
@@ -8724,34 +8858,53 @@ void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, 
     Eigen::VectorXd Pv_x_ref(N_plan_mpc);
     Eigen::VectorXd Pv_y_ref(N_plan_mpc);
     Eigen::VectorXd Pv_z_ref(N_plan_mpc);
-
+    Eigen::VectorXd lf_checker(N_plan_mpc); lf_checker.setZero();
+    Eigen::VectorXd rf_checker(N_plan_mpc); rf_checker.setZero();
+    
     for(int i = 0; i < N_plan_mpc; i++)
     {
-        Pv_x_ref(i) = ref_zmp_mpc_(mpc_tick + mpc_synchro_hz*(i+1),0);
-        Pv_y_ref(i) = ref_zmp_mpc_(mpc_tick + mpc_synchro_hz*(i+1),1);
-        Pv_z_ref(i) = ref_com_z_mpc_(mpc_tick + mpc_synchro_hz*(i+1),0);
+        Pv_x_ref(i)         = ref_zmp_mpc_          (mpc_tick + mpc_synchro_hz * (i + 1), 0);
+        Pv_y_ref(i)         = ref_zmp_mpc_          (mpc_tick + mpc_synchro_hz * (i + 1), 1);
+        Pv_z_ref(i)         = ref_com_z_mpc_        (mpc_tick + mpc_synchro_hz * (i + 1), 0);
 
-        zmp_max_x_mpc_(i) = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1),0) + zmp_x_max;     
-        zmp_min_x_mpc_(i) = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1),0) - zmp_x_min;
+        zmp_max_x_mpc_(i)   = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz * (i + 1), 0) + zmp_x_max;     
+        zmp_min_x_mpc_(i)   = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz * (i + 1), 0) - zmp_x_min;
 
-        zmp_max_y_mpc_(i)   = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1),1) + zmp_y_max;
+        zmp_max_y_mpc_(i)   = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz * (i + 1), 1) + zmp_y_max;
+        zmp_min_y_mpc_(i)   = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz * (i + 1), 1) - zmp_y_min;
 
-        zmp_max_Lpy_mpc_(i) = (1 - foot_step_(current_step_num_mpc_, 6))*foot_step_support_frame_mpc_(current_step_num_mpc_, 1)
-                            +      foot_step_(current_step_num_mpc_, 6) *foot_step_support_frame_mpc_(min(current_step_num_mpc_ + 1, total_step_num_), 1)
-                            + zmp_y_max;
+        zmp_max_Lpy_mpc_(i) = ref_lzmp_mpc_         (mpc_tick + mpc_synchro_hz * (i + 1), 1) + zmp_y_max;
+        zmp_min_Lpy_mpc_(i) = ref_lzmp_mpc_         (mpc_tick + mpc_synchro_hz * (i + 1), 1) - zmp_y_min;
 
-        zmp_max_Rpy_mpc_(i) =      foot_step_(current_step_num_mpc_, 6) *foot_step_support_frame_mpc_(current_step_num_mpc_, 1)
-                            + (1 - foot_step_(current_step_num_mpc_, 6))*foot_step_support_frame_mpc_(min(current_step_num_mpc_ + 1, total_step_num_), 1)
-                            + zmp_y_max;
+        zmp_max_Rpy_mpc_(i) = ref_rzmp_mpc_         (mpc_tick + mpc_synchro_hz * (i + 1), 1) + zmp_y_max;
+        zmp_min_Rpy_mpc_(i) = ref_rzmp_mpc_         (mpc_tick + mpc_synchro_hz * (i + 1), 1) - zmp_y_min;
 
-        zmp_min_y_mpc_(i)   = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1),1) - zmp_y_min;
-    }
+        for(int step = 0; step < 3; step++)
+        {
+            if(mpc_tick + mpc_synchro_hz*(i+1) > t_total_*step + t_double1_ + t_rest_init_)
+            {
+                if(mpc_tick + mpc_synchro_hz*(i+1) < t_total_*step + t_total_ - t_double2_ - t_rest_last_)
+                {
+                    if(foot_step_(current_step_num_mpc_ + step, 6) == 0)
+                    {
+                        lf_checker(i) = 0;
+                        rf_checker(i) = 1;
+                    }
+                    else
+                    {
+                        lf_checker(i) = 1;
+                        rf_checker(i) = 0;
+                    }
+                }
+            }
 
-    if(current_step_num_mpc_ == 0) { zmp_max_Lpy_mpc_ = zmp_max_Lpy_mpc_ - 0.02*MatrixXd::Ones(N_plan_mpc, 1); }
-    if(current_step_num_mpc_ == 1) { zmp_max_Rpy_mpc_ = zmp_max_Rpy_mpc_ + 0.01*MatrixXd::Ones(N_plan_mpc, 1); }
-    
-    zmp_min_Lpy_mpc_ = zmp_max_Lpy_mpc_ - 2*zmp_y_min*MatrixXd::Ones(N_plan_mpc, 1);
-    zmp_min_Rpy_mpc_ = zmp_max_Rpy_mpc_ - 2*zmp_y_min*MatrixXd::Ones(N_plan_mpc, 1);
+            if((mpc_tick + mpc_synchro_hz*(i+1) < t_temp_) && (current_step_num_mpc_ == 0))
+            {
+                lf_checker(i) = 0.5;
+                rf_checker(i) = 0.5;
+            }
+        }
+    } 
 
     //Z direction
     gcalc_plan_mpc_.setZero(N_plan_mpc, N_plan_mpc);
@@ -8826,9 +8979,9 @@ void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, 
     QP_MPC_Planner_X_.DeleteSubjectToAx();
     QP_MPC_Planner_X_.DeleteSubjectToX();
 
-    const_A_mpc_.setZero( 10*N_plan_mpc, 4*N_plan_mpc);
-    const_ub_mpc_.setZero(10*N_plan_mpc, 1);
-    const_lb_mpc_.setZero(10*N_plan_mpc, 1);
+    const_A_mpc_.setZero( 4*N_plan_mpc, 4*N_plan_mpc);
+    const_ub_mpc_.setZero(4*N_plan_mpc, 1);
+    const_lb_mpc_.setZero(4*N_plan_mpc, 1);
 
     //zmp const
     const_A_mpc_.block( 0*N_plan_mpc, 0, N_plan_mpc, 4*N_plan_mpc) = Pvpu_plan_mpc_*SUp_plan_mpc_;
@@ -8866,118 +9019,120 @@ void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, 
     gcalc_plan_mpc_.setZero(4*N_plan_mpc, N_plan_mpc);
     Qycalc_plan_mpc_ = SUp_plan_mpc_.transpose()*(Pvpu_plan_mpc_.transpose()*wpvy*Qmat_plan_mpc_*Pvpu_plan_mpc_ + wdvy*Qmat_plan_mpc_)*SUp_plan_mpc_
                      + SUplp_plan_mpc_.transpose()*wplvy*Qmat_plan_mpc_*SUplp_plan_mpc_
-                     + SUprp_plan_mpc_.transpose()*wprvy*Qmat_plan_mpc_*SUprp_plan_mpc_;
+                     + SUprp_plan_mpc_.transpose()*wprvy*Qmat_plan_mpc_*SUprp_plan_mpc_
+                     + SUpa_plan_mpc_.transpose() *wdalp*Qmat_plan_mpc_*SUpa_plan_mpc_;
     gycalc_plan_mpc_ = SUp_plan_mpc_.transpose()* Pvpu_plan_mpc_.transpose()*wpvy*Qmat_plan_mpc_;
     gcalc_plan_mpc_  = gycalc_plan_mpc_*(Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_ - Pv_y_ref)
                      + SUplp_plan_mpc_.transpose()*wplvy*Qmat_plan_mpc_*( - 0.5*(zmp_max_Lpy_mpc_ + zmp_min_Lpy_mpc_ - 0.04*MatrixXd::Ones(N_plan_mpc, 1)))
-                     + SUprp_plan_mpc_.transpose()*wprvy*Qmat_plan_mpc_*( - 0.5*(zmp_max_Rpy_mpc_ + zmp_min_Rpy_mpc_ + 0.04*MatrixXd::Ones(N_plan_mpc, 1)));
+                     + SUprp_plan_mpc_.transpose()*wprvy*Qmat_plan_mpc_*( - 0.5*(zmp_max_Rpy_mpc_ + zmp_min_Rpy_mpc_ + 0.04*MatrixXd::Ones(N_plan_mpc, 1)))
+                     + SUpa_plan_mpc_.transpose() *wdalp*Qmat_plan_mpc_*( - MPC_Planner_u_mpc_y_.segment(1*N_plan_mpc, N_plan_mpc));
 
     deldelQcalc_plan_mpc_ = Qycalc_plan_mpc_;
-    delgcalc_plan_mpc_ = Qycalc_plan_mpc_*MPC_Planner_u_mpc_y_ + gcalc_plan_mpc_;
 
-    QP_MPC_Planner_Y_.EnableEqualityCondition(equality_condition_eps_);
-    //QP_MPC_Planner_Y_.UpdateMinProblem(Qycalc_plan_mpc_, gcalc_plan_mpc_);
-    QP_MPC_Planner_Y_.UpdateMinProblem(deldelQcalc_plan_mpc_, delgcalc_plan_mpc_);
-    QP_MPC_Planner_Y_.DeleteSubjectToAx();
-    QP_MPC_Planner_Y_.DeleteSubjectToX();
+    const_A_mpc_.setZero( 4*N_plan_mpc, 4*N_plan_mpc);
+    const_ub_mpc_.setZero(4*N_plan_mpc, 1);
+    const_lb_mpc_.setZero(4*N_plan_mpc, 1);
 
-    const_A_mpc_.setZero( 10*N_plan_mpc, 4*N_plan_mpc);
-    const_ub_mpc_.setZero(10*N_plan_mpc, 1);
-    const_lb_mpc_.setZero(10*N_plan_mpc, 1);
-
-    //zmp const
-    const_A_mpc_.block( 0*N_plan_mpc, 0, N_plan_mpc, 4*N_plan_mpc) = Pvpu_plan_mpc_*SUp_plan_mpc_;
-    const_ub_mpc_.block(0*N_plan_mpc, 0, N_plan_mpc, 1) = - Pvpu_plan_mpc_*SUp_plan_mpc_*MPC_Planner_u_mpc_y_ + zmp_max_y_mpc_ - Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_;
-    const_lb_mpc_.block(0*N_plan_mpc, 0, N_plan_mpc, 1) = - Pvpu_plan_mpc_*SUp_plan_mpc_*MPC_Planner_u_mpc_y_ + zmp_min_y_mpc_ - Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_;
-
-    //lzmp rzmp sum
-    const_SQP_Phi_mpc_.setZero(4*N_plan_mpc, 4*N_plan_mpc);
+    const_SQP_Phi_mpc_.setZero     (4*N_plan_mpc, 4*N_plan_mpc);
     const_SQP_Phi_mpc_calc_.setZero(4*N_plan_mpc, 4*N_plan_mpc);
-    const_SQP_Pi_mpc_.setZero( 4*N_plan_mpc, 1);
-    const_SQP_ri_mpc_.setZero(            1, 1);
+    const_SQP_Pi_mpc_.setZero      (4*N_plan_mpc, 1);
+    const_SQP_ri_mpc_.setZero      (           1, 1);
 
-    for(int i = 0; i < N_plan_mpc; i++)
+    double sqp_iter = 1;
+    for(int s = 0; s < sqp_iter; s++)
     {
-        const_SQP_Phi_mpc_      = SUpa_plan_mpc_.row(i).transpose()*(SUprp_plan_mpc_ - SUplp_plan_mpc_).row(i);
-        const_SQP_Phi_mpc_calc_ = 0.5*(const_SQP_Phi_mpc_ + const_SQP_Phi_mpc_.transpose());
-        const_SQP_Pi_mpc_       = (Pvpu_plan_mpc_*SUp_plan_mpc_ - SUprp_plan_mpc_).row(i).transpose();
-        const_SQP_ri_mpc_       = Pvps_plan_mpc_.row(i)*ssy_plan_mpc_*MPC_Planner_state_mpc_;
+        delgcalc_plan_mpc_ = Qycalc_plan_mpc_*MPC_Planner_u_mpc_y_ + gcalc_plan_mpc_;
 
-        const_SQP_hi_mpc_       = MPC_Planner_u_mpc_y_.transpose()*const_SQP_Phi_mpc_*MPC_Planner_u_mpc_y_ 
-                                + const_SQP_Pi_mpc_.transpose()*MPC_Planner_u_mpc_y_
-                                + const_SQP_ri_mpc_;
-        
-        const_A_mpc_.row( 1*N_plan_mpc + i) = (2*const_SQP_Phi_mpc_calc_*MPC_Planner_u_mpc_y_ + const_SQP_Pi_mpc_).transpose();
-        const_ub_mpc_.row(1*N_plan_mpc + i) = - const_SQP_hi_mpc_;
-        const_lb_mpc_.row(1*N_plan_mpc + i) = -1e+3*MatrixXd::Identity(1,1);
-    }
+        QP_MPC_Planner_Y_.EnableEqualityCondition(equality_condition_eps_);
+        //QP_MPC_Planner_Y_.UpdateMinProblem(Qycalc_plan_mpc_, gcalc_plan_mpc_);
+        QP_MPC_Planner_Y_.UpdateMinProblem(deldelQcalc_plan_mpc_, delgcalc_plan_mpc_);
+        QP_MPC_Planner_Y_.DeleteSubjectToAx();
+        QP_MPC_Planner_Y_.DeleteSubjectToX();
 
-    ////alpha const
-    const_A_mpc_.block( 6*N_plan_mpc, 0, N_plan_mpc, 4*N_plan_mpc) = SUpa_plan_mpc_;
-    const_ub_mpc_.block(6*N_plan_mpc, 0, N_plan_mpc, 1)            = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Ones(N_plan_mpc, 1);
-    const_lb_mpc_.block(6*N_plan_mpc, 0, N_plan_mpc, 1)            = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Zero(N_plan_mpc, 1);
-
-    if(walking_tick_mpc_ > t_temp_)
-    {
-        if(walking_tick_mpc_ > t_start_mpc_ + t_double1_ + t_rest_init_ - hz_/thread3_hz_)
+        //lzmp rzmp sum
+        for(int i = 0; i < N_plan_mpc; i++)
         {
-            if(walking_tick_mpc_ < t_start_mpc_ + t_total_ - t_double2_ - t_rest_last_ - hz_/thread3_hz_)
+            const_SQP_Phi_mpc_      = SUpa_plan_mpc_.row(i).transpose()*(SUprp_plan_mpc_ - SUplp_plan_mpc_).row(i);
+            const_SQP_Phi_mpc_calc_ = 0.5*(const_SQP_Phi_mpc_ + const_SQP_Phi_mpc_.transpose());
+            const_SQP_Pi_mpc_       = (Pvpu_plan_mpc_*SUp_plan_mpc_ - SUprp_plan_mpc_).row(i).transpose();
+            const_SQP_ri_mpc_       = Pvps_plan_mpc_.row(i)*ssy_plan_mpc_*MPC_Planner_state_mpc_;
+
+            const_SQP_hi_mpc_       = MPC_Planner_u_mpc_y_.transpose()*const_SQP_Phi_mpc_*MPC_Planner_u_mpc_y_ 
+                                    + const_SQP_Pi_mpc_.transpose()*MPC_Planner_u_mpc_y_
+                                    + const_SQP_ri_mpc_;
+        
+            const_A_mpc_.row( 0*N_plan_mpc + i) = (2*const_SQP_Phi_mpc_calc_*MPC_Planner_u_mpc_y_ + const_SQP_Pi_mpc_).transpose();
+            const_ub_mpc_.row(0*N_plan_mpc + i) = - const_SQP_hi_mpc_;
+            const_lb_mpc_.row(0*N_plan_mpc + i) = - const_SQP_hi_mpc_;
+        }
+
+        //zmp const
+        //const_A_mpc_.block( 1*N_plan_mpc, 0, N_plan_mpc, 4*N_plan_mpc) = Pvpu_plan_mpc_*SUp_plan_mpc_;
+        //const_ub_mpc_.block(1*N_plan_mpc, 0, N_plan_mpc, 1) = - Pvpu_plan_mpc_*SUp_plan_mpc_*MPC_Planner_u_mpc_y_ + zmp_max_y_mpc_ - Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_;
+        //const_lb_mpc_.block(1*N_plan_mpc, 0, N_plan_mpc, 1) = - Pvpu_plan_mpc_*SUp_plan_mpc_*MPC_Planner_u_mpc_y_ + zmp_min_y_mpc_ - Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_;
+
+        const_A_mpc_.block( 1*N_plan_mpc, 0, N_plan_mpc, 4*N_plan_mpc) = SUplp_plan_mpc_;
+        const_ub_mpc_.block(1*N_plan_mpc, 0, N_plan_mpc, 1)            = - SUplp_plan_mpc_*MPC_Planner_u_mpc_y_ + zmp_max_Lpy_mpc_;
+        const_lb_mpc_.block(1*N_plan_mpc, 0, N_plan_mpc, 1)            = - SUplp_plan_mpc_*MPC_Planner_u_mpc_y_ + zmp_min_Lpy_mpc_;
+        const_A_mpc_.block( 2*N_plan_mpc, 0, N_plan_mpc, 4*N_plan_mpc) = SUprp_plan_mpc_;
+        const_ub_mpc_.block(2*N_plan_mpc, 0, N_plan_mpc, 1)            = - SUprp_plan_mpc_*MPC_Planner_u_mpc_y_ + zmp_max_Rpy_mpc_;
+        const_lb_mpc_.block(2*N_plan_mpc, 0, N_plan_mpc, 1)            = - SUprp_plan_mpc_*MPC_Planner_u_mpc_y_ + zmp_min_Rpy_mpc_;
+
+        ////alpha const
+        const_A_mpc_.block( 3*N_plan_mpc, 0, N_plan_mpc, 4*N_plan_mpc) = SUpa_plan_mpc_;
+        const_ub_mpc_.block(3*N_plan_mpc, 0, N_plan_mpc, 1)            = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Ones(N_plan_mpc, 1) - rf_checker;
+        const_lb_mpc_.block(3*N_plan_mpc, 0, N_plan_mpc, 1)            = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Zero(N_plan_mpc, 1) + lf_checker;
+
+        QP_MPC_Planner_Y_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
+
+        if(QP_MPC_Planner_Y_.SolveQPoases(100, MPC_Planner_delu_mpc_y_))
+        {
+            if((walking_tick_mpc_ - mpc_synchro_hz - 20)%int(2*hz_) == 0)
+            { 
+                cout << "sqp iteration: "                         << s    << endl;
+                cout << "VHIPM Planner SQ MPC Y direction Solved" << endl << endl;
+            }
+        
+            MPC_Planner_u_mpc_y_ = MPC_Planner_u_mpc_y_ + MPC_Planner_delu_mpc_y_;
+
+            if(s == sqp_iter - 1)
             {
-                if(foot_step_(current_step_num_mpc_, 6) == 0)
-                {
-                    const_ub_mpc_.block(6*N_plan_mpc, 0, N_plan_mpc, 1) = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Zero(N_plan_mpc, 1);
-                    const_lb_mpc_.block(6*N_plan_mpc, 0, N_plan_mpc, 1) = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Zero(N_plan_mpc, 1);
-                }
-                else
-                {
-                    const_ub_mpc_.block(6*N_plan_mpc, 0, N_plan_mpc, 1) = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Ones(N_plan_mpc, 1);
-                    const_lb_mpc_.block(6*N_plan_mpc, 0, N_plan_mpc, 1) = - SUpa_plan_mpc_*MPC_Planner_u_mpc_y_ + MatrixXd::Ones(N_plan_mpc, 1);
-                }
+                Planner_State_Prev_mpc_.row(3).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+                Planner_State_Prev_mpc_.row(4).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+                Planner_State_Prev_mpc_.row(5).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+        
+                prev_zmp.row(1).transpose()                = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+
+                MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*MPC_Planner_u_mpc_y_(0);
             }
         }
-    }
-
-
-    QP_MPC_Planner_Y_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
-
-    if(QP_MPC_Planner_Y_.SolveQPoases(100, MPC_Planner_delu_mpc_y_))
-    {
-        if((walking_tick_mpc_ - mpc_synchro_hz - 20)%int(2*hz_) == 0)
-        { cout << "VHIPM Planner SQ MPC Y direction Solved" << endl << endl; }
+        else
+        { 
+            cout << "sqp iteration: "                             << s    << endl;
+            cout << "VHIPM Planner SQ MPC Y direction Not Solved" << endl;
+            cout << int(walking_tick_mpc_ - 20)/mpc_synchro_hz    << endl << endl;;
         
-        MPC_Planner_u_mpc_y_ = MPC_Planner_u_mpc_y_ + MPC_Planner_delu_mpc_y_;
-
-        Planner_State_Prev_mpc_.row(3).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
-        Planner_State_Prev_mpc_.row(4).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
-        Planner_State_Prev_mpc_.row(5).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+            MPC_Planner_u_mpc_y_ = MPC_Planner_u_mpc_y_;
+            if(s == sqp_iter - 1)
+            {
+                Planner_State_Prev_mpc_.row(3).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+                Planner_State_Prev_mpc_.row(4).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+                Planner_State_Prev_mpc_.row(5).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
         
-        prev_zmp.row(1).transpose()                = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
+                prev_zmp.row(1).transpose()                = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
 
-        MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*MPC_Planner_u_mpc_y_(0);
-    }
-    else
-    { 
-        cout << "VHIPM Planner SQ MPC Y direction Not Solved" << endl << endl;
-        cout << int(walking_tick_mpc_ - 20)/mpc_synchro_hz << endl;
-        
-        MPC_Planner_u_mpc_y_ = MPC_Planner_u_mpc_y_;
-
-        Planner_State_Prev_mpc_.row(3).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
-        Planner_State_Prev_mpc_.row(4).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
-        Planner_State_Prev_mpc_.row(5).transpose() = Pcas_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcau_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
-        
-        prev_zmp.row(1).transpose()                = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_y_.segment(0, N_plan_mpc);
-
-        MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*MPC_Planner_u_mpc_y_(0);
+                MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*MPC_Planner_u_mpc_y_(0);
+            }
+        }
     }
 
     MPC_SQ_Planner_u_mpc_(1) = MPC_Planner_u_mpc_y_(0);
 
     Cvp_mpc_ << 1, 0, - Planner_State_Prev_mpc_(6,0)/(Planner_State_Prev_mpc_(8,0) + GRAVITY);
 
-    double alpha = MPC_Planner_u_mpc_y_(1*N_plan_mpc);
-    double lzmp  = MPC_Planner_u_mpc_y_(2*N_plan_mpc);
-    double rzmp  = MPC_Planner_u_mpc_y_(3*N_plan_mpc);
+    MPC_Planner_alpha_mpc_ = MPC_Planner_u_mpc_y_(1*N_plan_mpc);
+    MPC_Planner_lzmp_mpc_  = MPC_Planner_u_mpc_y_(2*N_plan_mpc);
+    MPC_Planner_rzmp_mpc_  = MPC_Planner_u_mpc_y_(3*N_plan_mpc);
 
     e_qcqp_gurobi_graph << setprecision(10)
                         << Pv_x_ref(0)               << "," << Pv_y_ref(0)               << "," << Pv_z_ref(0)               << ","
@@ -8985,10 +9140,20 @@ void AvatarController::VHIPM_CoM_SQ_Planner_MPC(double mpc_freq, double mpc_dt, 
                         << MPC_Planner_state_mpc_(1) << "," << MPC_Planner_state_mpc_(4) << "," << MPC_Planner_state_mpc_(7) << ","
                         << MPC_Planner_state_mpc_(2) << "," << MPC_Planner_state_mpc_(5) << "," << MPC_Planner_state_mpc_(8) << ","
                         << zmp_max_x_mpc_(0)         << "," << zmp_max_y_mpc_(0)         << "," << 0                         << ","
-                        << prev_zmp(0,0)             << "," << prev_zmp(1,0)             << "," << alpha                     << ","
-                        << zmp_max_Lpy_mpc_(0)       << "," << zmp_min_Lpy_mpc_(0)       << "," << lzmp                      << ","
-                        << zmp_max_Rpy_mpc_(0)       << "," << zmp_min_Rpy_mpc_(0)       << "," << rzmp                      << ","
+                        << prev_zmp(0,0)             << "," << prev_zmp(1,0)             << "," << MPC_Planner_alpha_mpc_    << ","
+                        << zmp_max_Lpy_mpc_(0)       << "," << zmp_min_Lpy_mpc_(0)       << "," << MPC_Planner_lzmp_mpc_     << ","
+                        << zmp_max_Rpy_mpc_(0)       << "," << zmp_min_Rpy_mpc_(0)       << "," << MPC_Planner_rzmp_mpc_     << ","
                         << endl;
+
+    e_tmp_graph3 << Pv_y_ref.transpose() << endl;
+    e_tmp_graph4 << prev_zmp.row(1)      << endl;
+    e_tmp_graph5 << MPC_Planner_u_mpc_y_.segment(1*N_plan_mpc, N_plan_mpc).transpose() << endl;
+    e_tmp_graph6 << MPC_Planner_u_mpc_y_.segment(2*N_plan_mpc, N_plan_mpc).transpose() << endl;
+    e_tmp_graph7 << MPC_Planner_u_mpc_y_.segment(3*N_plan_mpc, N_plan_mpc).transpose() << endl;
+    e_tmp_graph8 << lf_checker.transpose() << endl;
+    e_tmp_graph9 << rf_checker.transpose() << endl;
+    e_tmp_graph10 << zmp_max_Lpy_mpc_.transpose() << endl;
+    e_tmp_graph11 << zmp_max_Rpy_mpc_.transpose() << endl;
 }
 
 ////////////////////// Econom2 function end
@@ -9554,36 +9719,41 @@ void AvatarController::CP_compen_MJ_FT()
 
     Eigen::Vector3d del_vrp_desired, vrp_desired;
     del_vrp_desired(0) = 1.4*(dcm_measured_(0) - dcm_desired_(0));
-    del_vrp_desired(1) = 1.05*(dcm_measured_(1) - dcm_desired_(1));
+    del_vrp_desired(1) = 1.3*(dcm_measured_(1) - dcm_desired_(1));
     del_vrp_desired(2) = 1.05*(dcm_measured_(2) - dcm_desired_(2));
 
     vrp_desired(0) = zmp_desired_(0) + del_vrp_desired(0);
-    vrp_desired(1) = zmp_desired_(1) + del_vrp_desired(1);
+    //vrp_desired(1) = zmp_desired_(1) + del_vrp_desired(1);
+    vrp_desired(1) = MPC_Planner_lzmp_main_*MPC_Planner_alpha_main_
+                   + MPC_Planner_rzmp_main_*(1 - MPC_Planner_alpha_main_)
+                   + del_vrp_desired(1);
     vrp_desired(2) = zc_mj_          + del_vrp_desired(2);
 
     lambda_desired = (com_desired_(2) - vrp_desired(2) + GRAVITY*b_*b_)/(com_desired_(2)*b_*b_);
     ZMP_X_DES_CALC = (vrp_desired(0) - (1 - lambda_desired*b_*b_)*com_desired_(0))/(lambda_desired*b_*b_);
     ZMP_Y_DES_CALC = (vrp_desired(1) - (1 - lambda_desired*b_*b_)*com_desired_(1))/(lambda_desired*b_*b_);
 
-    Eigen::Vector2d foot_center;
-    foot_center(0) = ref_zmp_wo_offset_(walking_tick_ - (bool)current_step_num_*t_start_, 0);
-    foot_center(1) = ref_zmp_wo_offset_(walking_tick_ - (bool)current_step_num_*t_start_, 1);
-
     Eigen::Vector3d foot_force;
     foot_force(0) = rd_.link_[COM_id].mass*w_*w_*(com_desired_(0) - vrp_desired(0));
     foot_force(1) = rd_.link_[COM_id].mass*w_*w_*(com_desired_(1) - vrp_desired(1));
     foot_force(2) = rd_.link_[COM_id].mass*w_*w_*(com_desired_(2) - vrp_desired(2)) + rd_.link_[COM_id].mass*GRAVITY;
 
-    e_tmp_graph1 << foot_center(0)   << "," << foot_center(1)   << "," << 0                << ","
-                 << vrp_desired(0)   << "," << vrp_desired(1)   << "," << vrp_desired(2)   << ","
-                 << dcm_desired_(0)  << "," << dcm_desired_(1)  << "," << dcm_desired_(2)  << ","
-                 << dcm_measured_(0) << "," << dcm_measured_(1) << "," << dcm_measured_(2) << ","
-                 << foot_force(0)    << "," << foot_force(1)    << "," << foot_force(2)    << ","
+    double lzmp_calc = MPC_Planner_lzmp_main_ + del_vrp_desired(1)*MPC_Planner_alpha_main_;
+    double rzmp_calc = MPC_Planner_rzmp_main_ + del_vrp_desired(1)*(1 - MPC_Planner_alpha_main_);
+
+    e_tmp_graph1 << dcm_desired_(0)         << "," << dcm_desired_(1)        << "," << dcm_desired_(2)         << ","
+                 << dcm_measured_(0)        << "," << dcm_measured_(1)       << "," << dcm_measured_(2)        << ","
+                 << vrp_desired(0)          << "," << vrp_desired(1)         << "," << vrp_desired(2)          << ","
+                 << zmp_desired_(0)         << "," << zmp_desired_(1)        << "," << zc_mj_                  << ","
+                 << ZMP_X_DES_CALC          << "," << ZMP_Y_DES_CALC         << "," << zc_mj_                  << ","
+                 << MPC_Planner_lzmp_main_  << "," << MPC_Planner_rzmp_main_ << "," << MPC_Planner_alpha_main_ << ","
+                 << lzmp_calc               << "," << rzmp_calc              << "," << 0                       << ","
                  << endl;
 
     double calc_z_max = 0.08;
 
     alpha = (ZMP_Y_DES_CALC - (rfoot_support_current_.translation()(1) + calc_z_max)) / ((lfoot_support_current_.translation()(1) - calc_z_max) - (rfoot_support_current_.translation()(1) + calc_z_max));
+    alpha = MPC_Planner_alpha_main_;
     alpha = DyrosMath::minmax_cut(alpha, 0.0, 1.0); // 왼발 지지때 alpha = 1
 
     double real_robot_mass_offset_ = 52/GRAVITY; // 42 75

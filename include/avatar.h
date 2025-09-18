@@ -1070,6 +1070,7 @@ public:
     void zmpGenerator_wComZ_e(const unsigned int norm_size, const unsigned planning_step_num);
     void onestepZmp(unsigned int current_step_number, Eigen::VectorXd& temp_px, Eigen::VectorXd& temp_py);
     void onestepZmp_wo_offset(unsigned int current_step_number, double t_total_zmp, Eigen::VectorXd& temp_px, Eigen::VectorXd& temp_py, Eigen::VectorXd& temp_px_wo_offset, Eigen::VectorXd& temp_py_wo_offset);
+    void onestepZmp_LR(unsigned int current_step_number, double t_total_zmp, Eigen::VectorXd& temp_lpx, Eigen::VectorXd& temp_rpx, Eigen::VectorXd& temp_lpy, Eigen::VectorXd& temp_rpy);
     void onestepComZ(unsigned int current_step_number, double t_total_zmp, Eigen::VectorXd& temp_cz);
     void getComTrajectory();
     void getFootTrajectory();
@@ -1206,6 +1207,7 @@ public:
     double w_ = 0.0;
     
     Eigen::Vector2d del_F_;
+    Eigen::Vector2d del_F_prev_;
     Eigen::Vector2d sc_err_before;
     Eigen::Vector2d sc_err_after;
     Eigen::Vector2d SC_com;
@@ -1236,12 +1238,18 @@ public:
     Eigen::Vector6d swingfoot_support_init_;
 
     Eigen::MatrixXd ref_zmp_;
-    Eigen::MatrixXd ref_zmp_wo_offset_;
-    Eigen::MatrixXd ref_zmp_wo_offset_mpc_;
-    Eigen::MatrixXd ref_zmp_wo_offset_container_to_mpc_;
-
     Eigen::MatrixXd ref_zmp_mpc_;
     Eigen::MatrixXd ref_zmp_container_to_mpc_;
+    Eigen::MatrixXd ref_zmp_wo_offset_;
+    Eigen::MatrixXd ref_zmp_wo_offset_mpc_;
+    Eigen::MatrixXd ref_zmp_wo_offset_container_to_mpc_;    
+
+    Eigen::MatrixXd ref_lzmp_;
+    Eigen::MatrixXd ref_lzmp_mpc_;
+    Eigen::MatrixXd ref_lzmp_container_to_mpc_;
+    Eigen::MatrixXd ref_rzmp_;
+    Eigen::MatrixXd ref_rzmp_mpc_;
+    Eigen::MatrixXd ref_rzmp_container_to_mpc_;
 
     Eigen::MatrixXd ref_vrp_mpc_;
 
@@ -1534,7 +1542,19 @@ public:
     Eigen::VectorXd MPC_SQ_Planner_u_mpc_;
     Eigen::VectorXd MPC_Planner_u_main_;
     Eigen::VectorXd MPC_Planner_u_container_from_mpc_;
+
+    double MPC_Planner_alpha_mpc_;
+    double MPC_Planner_alpha_container_from_mpc_;
+    double MPC_Planner_alpha_main_;
     
+    double MPC_Planner_lzmp_mpc_;
+    double MPC_Planner_lzmp_container_from_mpc_;
+    double MPC_Planner_lzmp_main_;
+
+    double MPC_Planner_rzmp_mpc_;
+    double MPC_Planner_rzmp_container_from_mpc_;
+    double MPC_Planner_rzmp_main_;
+
     Eigen::MatrixXd Planner_State_Prev_mpc_;
 
     //WBD
