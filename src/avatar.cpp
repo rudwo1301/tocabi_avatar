@@ -2,41 +2,41 @@
 #include <fstream>
 using namespace TOCABI;
 
-ofstream e_mpc_time_graph("/home/econom2-20/data/e_mpc_time_graph.txt");
-ofstream e_mpc_time_graph3("/home/econom2-20/data/e_mpc_time_graph3.txt");
-ofstream e_mpc_time_graph4("/home/econom2-20/data/e_mpc_time_graph4.txt");
-ofstream e_main_time_graph("/home/econom2-20/data/e_main_time_graph.txt");
-ofstream e_mpc_planner_data("/home/econom2-20/data/e_mpc_planner_data.txt");
+ofstream e_mpc_time_graph     ("/home/econom2-20/data/e_mpc_time_graph.txt");
+ofstream e_mpc_time_graph3    ("/home/econom2-20/data/e_mpc_time_graph3.txt");
+ofstream e_mpc_time_graph4    ("/home/econom2-20/data/e_mpc_time_graph4.txt");
+ofstream e_main_time_graph    ("/home/econom2-20/data/e_main_time_graph.txt");
+ofstream e_mpc_planner_data   ("/home/econom2-20/data/e_mpc_planner_data.txt");
 ofstream e_mpc_stabilizer_data("/home/econom2-20/data/e_mpc_stabilizer_data.txt");
 
-ofstream e_tmp_graph1("/home/econom2-20/data/e_tmp_graph1.txt");
-ofstream e_tmp_graph2("/home/econom2-20/data/e_tmp_graph2.txt");
-ofstream e_tmp_graph3("/home/econom2-20/data/e_tmp_graph3.txt");
-ofstream e_tmp_graph4("/home/econom2-20/data/e_tmp_graph4.txt");
-ofstream e_tmp_graph5("/home/econom2-20/data/e_tmp_graph5.txt");
-ofstream e_tmp_graph6("/home/econom2-20/data/e_tmp_graph6.txt");
-ofstream e_tmp_graph7("/home/econom2-20/data/e_tmp_graph7.txt");
-ofstream e_tmp_graph8("/home/econom2-20/data/e_tmp_graph8.txt");
-ofstream e_tmp_graph9("/home/econom2-20/data/e_tmp_graph9.txt");
-ofstream e_tmp_graph10("/home/econom2-20/data/e_tmp_graph10.txt");
-ofstream e_tmp_graph11("/home/econom2-20/data/e_tmp_graph11.txt");
-ofstream e_tmp_graph12("/home/econom2-20/data/e_tmp_graph12.txt");
-ofstream e_tmp_graph13("/home/econom2-20/data/e_tmp_graph13.txt");
-ofstream e_tmp_graph14("/home/econom2-20/data/e_tmp_graph14.txt");
-ofstream e_tmp_graph15("/home/econom2-20/data/e_tmp_graph15.txt");
-ofstream e_tmp_graph16("/home/econom2-20/data/e_tmp_graph16.txt");
-ofstream e_tmp_graph17("/home/econom2-20/data/e_tmp_graph17.txt");
-ofstream e_tmp_graph18("/home/econom2-20/data/e_tmp_graph18.txt");
-ofstream e_tmp_graph19("/home/econom2-20/data/e_tmp_graph19.txt");
-ofstream e_tmp_graph20("/home/econom2-20/data/e_tmp_graph20.txt");
-ofstream e_tmp_graph21("/home/econom2-20/data/e_tmp_graph21.txt");
-ofstream e_tmp_graph22("/home/econom2-20/data/e_tmp_graph22.txt");
-ofstream e_tmp_graph23("/home/econom2-20/data/e_tmp_graph23.txt");
-ofstream e_tmp_graph24("/home/econom2-20/data/e_tmp_graph24.txt");
-ofstream e_tmp_graph25("/home/econom2-20/data/e_tmp_graph25.txt");
-ofstream e_tmp_graph26("/home/econom2-20/data/e_tmp_graph26.txt");
-ofstream e_tmp_graph27("/home/econom2-20/data/e_tmp_graph27.txt");
-ofstream e_tmp_graph28("/home/econom2-20/data/e_tmp_graph28.txt");
+ofstream e_tmp_graph1         ("/home/econom2-20/data/e_tmp_graph1.txt");
+ofstream e_tmp_graph2         ("/home/econom2-20/data/e_tmp_graph2.txt");
+ofstream e_tmp_graph3         ("/home/econom2-20/data/e_tmp_graph3.txt");
+ofstream e_tmp_graph4         ("/home/econom2-20/data/e_tmp_graph4.txt");
+ofstream e_tmp_graph5         ("/home/econom2-20/data/e_tmp_graph5.txt");
+ofstream e_tmp_graph6         ("/home/econom2-20/data/e_tmp_graph6.txt");
+ofstream e_tmp_graph7         ("/home/econom2-20/data/e_tmp_graph7.txt");
+ofstream e_tmp_graph8         ("/home/econom2-20/data/e_tmp_graph8.txt");
+ofstream e_tmp_graph9         ("/home/econom2-20/data/e_tmp_graph9.txt");
+ofstream e_tmp_graph10        ("/home/econom2-20/data/e_tmp_graph10.txt");
+ofstream e_tmp_graph11        ("/home/econom2-20/data/e_tmp_graph11.txt");
+ofstream e_tmp_graph12        ("/home/econom2-20/data/e_tmp_graph12.txt");
+ofstream e_tmp_graph13        ("/home/econom2-20/data/e_tmp_graph13.txt");
+ofstream e_tmp_graph14        ("/home/econom2-20/data/e_tmp_graph14.txt");
+ofstream e_tmp_graph15        ("/home/econom2-20/data/e_tmp_graph15.txt");
+ofstream e_tmp_graph16        ("/home/econom2-20/data/e_tmp_graph16.txt");
+ofstream e_tmp_graph17        ("/home/econom2-20/data/e_tmp_graph17.txt");
+ofstream e_tmp_graph18        ("/home/econom2-20/data/e_tmp_graph18.txt");
+ofstream e_tmp_graph19        ("/home/econom2-20/data/e_tmp_graph19.txt");
+ofstream e_tmp_graph20        ("/home/econom2-20/data/e_tmp_graph20.txt");
+ofstream e_tmp_graph21        ("/home/econom2-20/data/e_tmp_graph21.txt");
+ofstream e_tmp_graph22        ("/home/econom2-20/data/e_tmp_graph22.txt");
+ofstream e_tmp_graph23        ("/home/econom2-20/data/e_tmp_graph23.txt");
+ofstream e_tmp_graph24        ("/home/econom2-20/data/e_tmp_graph24.txt");
+ofstream e_tmp_graph25        ("/home/econom2-20/data/e_tmp_graph25.txt");
+ofstream e_tmp_graph26        ("/home/econom2-20/data/e_tmp_graph26.txt");
+ofstream e_tmp_graph27        ("/home/econom2-20/data/e_tmp_graph27.txt");
+ofstream e_tmp_graph28        ("/home/econom2-20/data/e_tmp_graph28.txt");
 
 AvatarController::AvatarController(RobotData &rd) : rd_(rd)
 {
