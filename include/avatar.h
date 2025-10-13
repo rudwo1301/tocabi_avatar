@@ -1634,6 +1634,8 @@ public:
     int MPC_Stabilizer_time_adj_tick_y_container_from_mpc_;
     int MPC_Stabilizer_time_adj_tick_y_main_;
 
+    bool mpc_on_bool_ = true;
+
     //wbd
     void stateMachine();
 

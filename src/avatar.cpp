@@ -606,8 +606,15 @@ void AvatarController::computeSlow()
             if (current_step_num_ < total_step_num_)
             {   
                 getZmpTrajectory();
-                getComTrajectory_mpc();
-                //getComTrajectory();
+                //mpc_on_bool_ = false;
+                if(mpc_on_bool_)
+                {
+                    getComTrajectory_mpc();
+                }
+                else
+                {
+                    getComTrajectory();
+                }
                 getFootTrajectory_stepping();
                 getPelvTrajectory(); 
                 supportToFloatPattern();
@@ -5549,6 +5556,8 @@ Eigen::VectorQd AvatarController::ikBalanceControlCompute()
 
 void AvatarController::computeThread3()
 {   
+    if(mpc_on_bool_)
+    {
     std::chrono::steady_clock::time_point t1 = std::chrono::steady_clock::now();
     if(atb_main_to_mpc_update_ == false)
     {
@@ -5615,6 +5624,7 @@ void AvatarController::computeThread3()
     std::chrono::steady_clock::time_point t3 = std::chrono::steady_clock::now();
 
     e_mpc_time_graph << std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count()*1e-6 << endl;
+    }
 }
 
 void AvatarController::econom2_thread_stepchange()
@@ -8067,8 +8077,15 @@ void AvatarController::getFootTrajectory_stepping()
     time_adj_tick_main_foot_traj = min(time_adj_tick_main_foot_traj, double(step_time_adj_candidate_num_ - 1));
 
     double t_total_foot_traj_;
-    t_total_foot_traj_ = t_total_const_ - time_adj_tick_main_foot_traj*hz_/thread3_hz_;
-    //t_total_foot_traj_ = t_total_const_;
+
+    if(mpc_on_bool_)
+    {
+        t_total_foot_traj_ = t_total_const_ - time_adj_tick_main_foot_traj*hz_/thread3_hz_;
+    }
+    else
+    {
+        t_total_foot_traj_ = t_total_const_;
+    }
 
     Eigen::Vector3d lfoot_float_current_euler;
     Eigen::Vector3d rfoot_float_current_euler;
@@ -10619,6 +10636,9 @@ void AvatarController::getComTrajectory()
     com_desired_(1) = yd_mj_(0);
     com_desired_(2) = zc_mj_;
 
+    dcm_desired_(0) = cp_desired_(0);
+    dcm_desired_(1) = cp_desired_(1);
+
     MPC_Stabilizer_state_main_(0) = com_desired_(0);
     MPC_Stabilizer_state_main_(3) = com_desired_(1);
     MPC_Stabilizer_state_main_(6) = com_desired_(2);
@@ -10943,7 +10963,9 @@ void AvatarController::CP_compen_MJ_FT()
                  << dcm_measured_(0) << "," << dcm_measured_(1) << "," << dcm_measured_(2) << ","
                  << com_measured_(0) << "," << com_measured_(1) << "," << com_measured_(2) << ","
                  << ZMP_X_DES_CALC   << "," << ZMP_Y_DES_CALC   << "," << 0                << ","
+                 << zmp_desired_(0)  << "," << zmp_desired_(1)  << "," << 0                << ","
                  << endl;
+                 
     double real_robot_mass_offset_ = 52/GRAVITY; // 42 75
     if(param_sim_mode_) { real_robot_mass_offset_ = 0.0; }
 
