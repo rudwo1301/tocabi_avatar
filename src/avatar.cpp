@@ -7912,14 +7912,16 @@ void AvatarController::getFootTrajectory()
             lfoot_trajectory_euler_support_.setZero();
             
             rfoot_trajectory_support_.translation() = rfoot_support_init_.translation();
+            rfoot_trajectory_support_.translation()(2) = 0;
             rfoot_trajectory_euler_support_ = rfoot_support_euler_init_;
         }
         else if (foot_step_(current_step_num_, 6) == 0) // 오른발 지지
         {
-            rfoot_trajectory_euler_support_.setZero();
             rfoot_trajectory_support_.translation().setZero();
+            rfoot_trajectory_euler_support_.setZero();
 
             lfoot_trajectory_support_.translation() = lfoot_support_init_.translation();
+            lfoot_trajectory_support_.translation()(2) = 0;
             lfoot_trajectory_euler_support_ = lfoot_support_euler_init_;            
         }
 
@@ -7938,12 +7940,13 @@ void AvatarController::getFootTrajectory()
 
             if (walking_tick_ < t_start_ + t_dsp1_foot_traj + (t_total_ - t_dsp1_foot_traj - t_dsp2_foot_traj) / 2.0)
             {
-
                 rfoot_trajectory_support_.translation()(2) = DyrosMath::cubic(walking_tick_, t_start_ + t_dsp1_foot_traj, t_start_ + t_dsp1_foot_traj + (t_total_ - t_dsp1_foot_traj - t_dsp2_foot_traj) / 2.0, rfoot_support_init_.translation()(2), rfoot_support_init_.translation()(2) + foot_height_, 0.0, 0.0);
+                rfoot_trajectory_support_.translation()(2) = DyrosMath::cubic(walking_tick_, t_start_ + t_dsp1_foot_traj, t_start_ + t_dsp1_foot_traj + (t_total_ - t_dsp1_foot_traj - t_dsp2_foot_traj) / 2.0, 0.0, foot_height_, 0.0, 0.0);
             }
             else
             {
                 rfoot_trajectory_support_.translation()(2) = DyrosMath::cubic(walking_tick_, t_start_ + t_dsp1_foot_traj + (t_total_ - t_dsp1_foot_traj - t_dsp2_foot_traj) / 2.0, t_start_ + t_total_ - t_dsp2_foot_traj, rfoot_support_init_.translation()(2) + foot_height_, target_swing_foot(2), 0.0, 0.0);
+                rfoot_trajectory_support_.translation()(2) = DyrosMath::cubic(walking_tick_, t_start_ + t_dsp1_foot_traj + (t_total_ - t_dsp1_foot_traj - t_dsp2_foot_traj) / 2.0, t_start_ + t_total_ - t_dsp2_foot_traj, foot_height_, target_swing_foot(2), 0.0, 0.0);
             }
 
             for (int i = 0; i < 2; i++)
@@ -7966,10 +7969,12 @@ void AvatarController::getFootTrajectory()
             if (walking_tick_ < t_start_ + t_dsp1_foot_traj + (t_total_ - t_dsp1_foot_traj - t_dsp2_foot_traj) / 2.0)
             {
                 lfoot_trajectory_support_.translation()(2) = DyrosMath::cubic(walking_tick_, t_start_ + t_dsp1_foot_traj, t_start_ + t_dsp1_foot_traj + (t_total_ - t_dsp1_foot_traj - t_dsp2_foot_traj) / 2.0, lfoot_support_init_.translation()(2), lfoot_support_init_.translation()(2) + foot_height_, 0.0, 0.0);
+                lfoot_trajectory_support_.translation()(2) = DyrosMath::cubic(walking_tick_, t_start_ + t_dsp1_foot_traj, t_start_ + t_dsp1_foot_traj + (t_total_ - t_dsp1_foot_traj - t_dsp2_foot_traj) / 2.0, 0.0, foot_height_, 0.0, 0.0);
             }
             else
             {
                 lfoot_trajectory_support_.translation()(2) = DyrosMath::cubic(walking_tick_, t_start_ + t_dsp1_foot_traj + (t_total_ - t_dsp1_foot_traj - t_dsp2_foot_traj) / 2.0, t_start_ + t_total_ - t_dsp2_foot_traj, lfoot_support_init_.translation()(2) + foot_height_, target_swing_foot(2), 0.0, 0.0);
+                lfoot_trajectory_support_.translation()(2) = DyrosMath::cubic(walking_tick_, t_start_ + t_dsp1_foot_traj + (t_total_ - t_dsp1_foot_traj - t_dsp2_foot_traj) / 2.0, t_start_ + t_total_ - t_dsp2_foot_traj, foot_height_, target_swing_foot(2), 0.0, 0.0);
             }
 
             for (int i = 0; i < 2; i++)
