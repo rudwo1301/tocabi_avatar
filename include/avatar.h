@@ -1366,6 +1366,7 @@ public:
 
     /////////////////// Econom2 variables ////////////////////
     Eigen::Vector2d zmp_desired_;
+    Eigen::Vector2d zmp_ref_;
     Eigen::Vector2d zmp_max_;
     Eigen::Vector2d zmp_min_;
     Eigen::VectorXd zmp_max_x_mpc_;
