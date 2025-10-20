@@ -670,6 +670,7 @@ public:
     double zc_;
     double gi_;
     double zmp_start_time_; //원래 코드에서는 start_time, zmp_ref 시작되는 time같음
+    double vrp_start_time_;
     double mpc_start_time_;
     
     Eigen::Matrix4d k_;
@@ -1091,11 +1092,14 @@ public:
     void onestepZmp_wo_offset(unsigned int current_step_number, double t_total_zmp, Eigen::VectorXd& temp_px, Eigen::VectorXd& temp_py, Eigen::VectorXd& temp_px_wo_offset, Eigen::VectorXd& temp_py_wo_offset);
     void onestepVrpZ(unsigned int current_step_number, double t_total_zmp, Eigen::VectorXd& temp_pz);
     void getComTrajectory();
+    void getComTrajectory_FIPM();
     void getFootTrajectory();
     void getFootTrajectory_stepping();
     void getPelvTrajectory();
     void previewcontroller(double dt, int NL, int tick, double x_i, double y_i, Eigen::Vector3d xs, Eigen::Vector3d ys, double& UX, double& UY, 
     Eigen::MatrixXd Gi, Eigen::VectorXd Gd, Eigen::MatrixXd Gx, Eigen::MatrixXd A, Eigen::VectorXd B, Eigen::MatrixXd C, Eigen::Vector3d &XD, Eigen::Vector3d &YD);  
+    void previewcontroller_FIPM(double dt, int NL, int tick, double x_i, double y_i, double z_i, Eigen::Vector3d xs, Eigen::Vector3d ys, Eigen::Vector3d zs, double& UX, double& UY, double UZ,
+    Eigen::MatrixXd Gi, Eigen::VectorXd Gd, Eigen::MatrixXd Gx, Eigen::MatrixXd A, Eigen::VectorXd B, Eigen::MatrixXd C, Eigen::Vector3d &XD, Eigen::Vector3d &YD, Eigen::Vector3d &ZD);
     void preview_Parameter(double dt, int NL, Eigen::MatrixXd& Gi, Eigen::VectorXd& Gd, Eigen::MatrixXd& Gx, Eigen::MatrixXd& A, Eigen::VectorXd& B, Eigen::MatrixXd& C);
     void addZmpOffset();
     void hip_compensator();
@@ -1249,9 +1253,11 @@ public:
 
     Eigen::Vector3d xs_mj_;
     Eigen::Vector3d ys_mj_;
+    Eigen::Vector3d zs_mj_;
     Eigen::Vector3d xd_mj_;
-    Eigen::Vector3d yd_mj_; 
-    Eigen::Vector3d preview_x_mj, preview_y_mj, preview_x_b_mj, preview_y_b_mj;
+    Eigen::Vector3d yd_mj_;
+    Eigen::Vector3d zd_mj_; 
+    Eigen::Vector3d preview_x_mj, preview_y_mj, preview_z_mj, preview_x_b_mj, preview_y_b_mj, preview_z_b_mj;
 
     Eigen::MatrixXd Gi_mj_;
     Eigen::MatrixXd Gx_mj_;
@@ -1321,7 +1327,7 @@ public:
     int current_step_num_;
     int current_step_num_mpc_;
 
-    double UX_mj_, UY_mj_; 
+    double UX_mj_, UY_mj_, UZ_mj_; 
     Eigen::Vector3d com_desired_;
     Eigen::MatrixXd foot_step_;
     Eigen::MatrixXd foot_step_support_frame_;

@@ -605,14 +605,15 @@ void AvatarController::computeSlow()
             if (current_step_num_ < total_step_num_)
             {   
                 getZmpTrajectory();
-                //mpc_on_bool_ = false;
+                mpc_on_bool_ = false;
                 if(mpc_on_bool_)
                 {
                     getComTrajectory_mpc();
                 }
                 else
                 {
-                    getComTrajectory();
+                    //getComTrajectory();
+                    getComTrajectory_FIPM();
                 }
                 //getFootTrajectory_stepping();
                 getFootTrajectory();
@@ -7887,10 +7888,11 @@ void AvatarController::onestepVrpZ(unsigned int current_step_number, double t_to
     double height_diff = 0.0;
 
     if(current_step_number ==  0) { height_diff = - 0.10*param_scenario_ - 0.00*(1 - param_scenario_); }
-    if(current_step_number ==  1) { height_diff = - 0.10*param_scenario_ - 0.00*(1 - param_scenario_); }
+    if(current_step_number ==  1) { height_diff = - 0.10*param_scenario_ - 0.05*(1 - param_scenario_); }
     if(current_step_number ==  2) { height_diff = - 0.10*param_scenario_ - 0.00*(1 - param_scenario_); }
-    if(current_step_number ==  3) { height_diff = - 0.10*param_scenario_ - 0.00*(1 - param_scenario_); }
+    if(current_step_number ==  3) { height_diff = - 0.10*param_scenario_ - 0.05*(1 - param_scenario_); }
     if(current_step_number ==  4) { height_diff = - 0.00*param_scenario_ - 0.00*(1 - param_scenario_); }
+    if(current_step_number ==  5) { height_diff = - 0.00*param_scenario_ - 0.05*(1 - param_scenario_); }
 
     //foot_step_support_frame_(current_step_number, 2) = height_diff;
 
@@ -8507,63 +8509,77 @@ void AvatarController::preview_Parameter(double dt, int NL, Eigen::MatrixXd &Gi,
     }
 }
 
-void AvatarController::previewcontroller(double dt, int NL, int tick, double x_i, double y_i, Eigen::Vector3d xs, Eigen::Vector3d ys, double &UX, double &UY,
-                                         Eigen::MatrixXd Gi, Eigen::VectorXd Gd, Eigen::MatrixXd Gx, Eigen::MatrixXd A, Eigen::VectorXd B, Eigen::MatrixXd C, Eigen::Vector3d &XD, Eigen::Vector3d &YD)
-{
-    ZMP_X_REF_ = ref_zmp_(tick,0);
-    ZMP_Y_REF_ = ref_zmp_(tick,1);  
+void AvatarController::previewcontroller_FIPM(double dt, int NL, int tick, double x_i, double y_i, double z_i, Eigen::Vector3d xs, Eigen::Vector3d ys, Eigen::Vector3d zs, double& UX, double& UY, double UZ,
+                                              Eigen::MatrixXd Gi, Eigen::VectorXd Gd, Eigen::MatrixXd Gx, Eigen::MatrixXd A, Eigen::VectorXd B, Eigen::MatrixXd C, Eigen::Vector3d &XD, Eigen::Vector3d &YD, Eigen::Vector3d &ZD)
+{                                           
+    Eigen::VectorXd vx, vy, vz;
+    vx.resize(1);
+    vy.resize(1);
+    vz.resize(1);
 
-    Eigen::VectorXd px, py;
-    px.resize(1);
-    py.resize(1);
-    
     if (tick == 0 && current_step_num_ == 0)
     {
         preview_x_b_mj.setZero();
         preview_y_b_mj.setZero();
+        preview_z_b_mj.setZero();
         preview_x_mj.setZero();
         preview_y_mj.setZero();
+        preview_z_mj.setZero();
         preview_x_b_mj(0) = x_i;
         preview_y_b_mj(0) = y_i;
+        preview_z_b_mj(0) = z_i;
         preview_x_mj(0) = x_i;
         preview_y_mj(0) = y_i;
+        preview_z_mj(0) = z_i;
         UX = 0;
         UY = 0;
+        UZ = 0;
         cout << "preview X state : " << preview_x_mj(0) << "," << preview_x_mj(1) << "," << preview_x_mj(2) << endl;
         cout << "preview Y state : " << preview_y_mj(0) << "," << preview_y_mj(1) << "," << preview_y_mj(2) << endl;
+        cout << "preview Z state : " << preview_z_mj(0) << "," << preview_z_mj(1) << "," << preview_z_mj(2) << endl;
     }
     else
     {
         preview_x_mj = xs;
         preview_y_mj = ys;
+        preview_z_mj = zs;
 
-        preview_x_b_mj(0) = preview_x_mj(0) - preview_x_mj(1) * 0.0005;
-        preview_y_b_mj(0) = preview_y_mj(0) - preview_y_mj(1) * 0.0005;
-        preview_x_b_mj(1) = preview_x_mj(1) - preview_x_mj(2) * 0.0005;
-        preview_y_b_mj(1) = preview_y_mj(1) - preview_y_mj(2) * 0.0005;
-        preview_x_b_mj(2) = preview_x_mj(2) - UX * 0.0005;
-        preview_y_b_mj(2) = preview_y_mj(2) - UY * 0.0005;
+        preview_x_b_mj(0) = preview_x_mj(0) - preview_x_mj(1) * dt;
+        preview_y_b_mj(0) = preview_y_mj(0) - preview_y_mj(1) * dt;
+        preview_z_b_mj(0) = preview_z_mj(0) - preview_z_mj(1) * dt;
+        preview_x_b_mj(1) = preview_x_mj(1) - preview_x_mj(2) * dt;
+        preview_y_b_mj(1) = preview_y_mj(1) - preview_y_mj(2) * dt;
+        preview_z_b_mj(1) = preview_z_mj(1) - preview_z_mj(2) * dt;
+        preview_x_b_mj(2) = preview_x_mj(2) - UX * dt;
+        preview_y_b_mj(2) = preview_y_mj(2) - UY * dt;
+        preview_z_b_mj(2) = preview_z_mj(2) - UZ * dt;
     }
-    px = C * preview_x_mj;
-    py = C * preview_y_mj;
+    vx = C * preview_x_mj;
+    vy = C * preview_y_mj;
+    vz = C * preview_z_mj;
 
-    double sum_Gd_px_ref = 0, sum_Gd_py_ref = 0;
+    double sum_Gd_vx_ref = 0, sum_Gd_vy_ref = 0, sum_Gd_vz_ref = 0;
 
     for (int i = 0; i < NL; i++)
     {
-        sum_Gd_px_ref = sum_Gd_px_ref + Gd(i) * (ref_zmp_(tick + 1 + i,0) - ref_zmp_(tick + i,0));
-        sum_Gd_py_ref = sum_Gd_py_ref + Gd(i) * (ref_zmp_(tick + 1 + i,1) - ref_zmp_(tick + i,1));
+        sum_Gd_vx_ref = sum_Gd_vx_ref + Gd(i) * (ref_vrp_(tick + 1 + i,0) - ref_vrp_(tick + i,0));
+        sum_Gd_vy_ref = sum_Gd_vy_ref + Gd(i) * (ref_vrp_(tick + 1 + i,1) - ref_vrp_(tick + i,1));
+        sum_Gd_vz_ref = sum_Gd_vz_ref + Gd(i) * (ref_vrp_(tick + 1 + i,2) - ref_vrp_(tick + i,2));
     }
 
     Eigen::MatrixXd del_ux(1, 1);
     Eigen::MatrixXd del_uy(1, 1);
+    Eigen::MatrixXd del_uz(1, 1);
     del_ux.setZero();
     del_uy.setZero();
+    del_uz.setZero();
 
     Eigen::VectorXd GX_X(1);
     GX_X = Gx * (preview_x_mj - preview_x_b_mj);
     Eigen::VectorXd GX_Y(1);
     GX_Y = Gx * (preview_y_mj - preview_y_b_mj);
+    Eigen::VectorXd GX_Z(1);
+    GX_Z = Gx * (preview_z_mj - preview_z_b_mj);
 
     if (walking_tick_ == 0)
     {
@@ -8571,17 +8587,115 @@ void AvatarController::previewcontroller(double dt, int NL, int tick, double x_i
         cout << "del_zmp : " << del_zmp(0) << "," << del_zmp(1) << endl;
     }
 
-    del_ux(0, 0) = -(px(0) - ref_zmp_(tick,0)) * Gi(0, 0) - GX_X(0) - sum_Gd_px_ref;
-    del_uy(0, 0) = -(py(0) - ref_zmp_(tick,1)) * Gi(0, 0) - GX_Y(0) - sum_Gd_py_ref;
+    del_ux(0, 0) = -(vx(0) - ref_vrp_(tick,0)) * Gi(0, 0) - GX_X(0) - sum_Gd_vx_ref;
+    del_uy(0, 0) = -(vy(0) - ref_vrp_(tick,1)) * Gi(0, 0) - GX_Y(0) - sum_Gd_vy_ref;
+    del_uz(0, 0) = -(vz(0) - ref_vrp_(tick,2)) * Gi(0, 0) - GX_Z(0) - sum_Gd_vz_ref;
 
     UX = UX + del_ux(0, 0);
     UY = UY + del_uy(0, 0);
+    UZ = UZ + del_uz(0, 0);
 
     XD = A * preview_x_mj + B * UX;
     YD = A * preview_y_mj + B * UY;    
+    ZD = A * preview_z_mj + B * UZ;    
 
-    cp_desired_(0) = XD(0) + XD(1) / w_;
-    cp_desired_(1) = YD(0) + YD(1) / w_; 
+    dcm_desired_(0) = XD(0) + XD(1) / w_;
+    dcm_desired_(1) = YD(0) + YD(1) / w_; 
+    dcm_desired_(2) = ZD(0) + ZD(1) / w_; 
+}
+
+void AvatarController::previewcontroller(double dt, int NL, int tick, double x_i, double y_i, Eigen::Vector3d xs, Eigen::Vector3d ys, double &UX, double &UY,
+                                         Eigen::MatrixXd Gi, Eigen::VectorXd Gd, Eigen::MatrixXd Gx, Eigen::MatrixXd A, Eigen::VectorXd B, Eigen::MatrixXd C, Eigen::Vector3d &XD, Eigen::Vector3d &YD)
+{  
+    Eigen::VectorXd vx, vy, vz;
+    vx.resize(1);
+    vy.resize(1);
+    vz.resize(1);
+    
+    if (tick == 0 && current_step_num_ == 0)
+    {
+        preview_x_b_mj.setZero();
+        preview_y_b_mj.setZero();
+        preview_z_b_mj.setZero();
+        preview_x_mj.setZero();
+        preview_y_mj.setZero();
+        preview_z_mj.setZero();
+        preview_x_b_mj(0) = x_i;
+        preview_y_b_mj(0) = y_i;
+        //preview_z_b_mj(0) = z_i;
+        preview_x_mj(0) = x_i;
+        preview_y_mj(0) = y_i;
+        //preview_z_mj(0) = z_i;
+        UX = 0;
+        UY = 0;
+        //UZ = 0;
+        cout << "preview X state : " << preview_x_mj(0) << "," << preview_x_mj(1) << "," << preview_x_mj(2) << endl;
+        cout << "preview Y state : " << preview_y_mj(0) << "," << preview_y_mj(1) << "," << preview_y_mj(2) << endl;
+        cout << "preview Z state : " << preview_z_mj(0) << "," << preview_z_mj(1) << "," << preview_z_mj(2) << endl;
+    }
+    else
+    {
+        preview_x_mj = xs;
+        preview_y_mj = ys;
+        //preview_z_mj = zs;
+
+        preview_x_b_mj(0) = preview_x_mj(0) - preview_x_mj(1) * 0.0005;
+        preview_y_b_mj(0) = preview_y_mj(0) - preview_y_mj(1) * 0.0005;
+        preview_z_b_mj(0) = preview_z_mj(0) - preview_z_mj(1) * 0.0005;
+        preview_x_b_mj(1) = preview_x_mj(1) - preview_x_mj(2) * 0.0005;
+        preview_y_b_mj(1) = preview_y_mj(1) - preview_y_mj(2) * 0.0005;
+        preview_z_b_mj(1) = preview_z_mj(1) - preview_z_mj(2) * 0.0005;
+        preview_x_b_mj(2) = preview_x_mj(2) - UX * 0.0005;
+        preview_y_b_mj(2) = preview_y_mj(2) - UY * 0.0005;
+        //preview_z_b_mj(2) = preview_z_mj(2) - UZ * 0.0005;
+    }
+    vx = C * preview_x_mj;
+    vy = C * preview_y_mj;
+    vz = C * preview_z_mj;
+
+    double sum_Gd_vx_ref = 0, sum_Gd_vy_ref = 0, sum_Gd_vz_ref = 0;
+
+    for (int i = 0; i < NL; i++)
+    {
+        sum_Gd_vx_ref = sum_Gd_vx_ref + Gd(i) * (ref_vrp_(tick + 1 + i,0) - ref_vrp_(tick + i,0));
+        sum_Gd_vy_ref = sum_Gd_vy_ref + Gd(i) * (ref_vrp_(tick + 1 + i,1) - ref_vrp_(tick + i,1));
+    }
+
+    Eigen::MatrixXd del_ux(1, 1);
+    Eigen::MatrixXd del_uy(1, 1);
+    Eigen::MatrixXd del_uz(1, 1);
+    del_ux.setZero();
+    del_uy.setZero();
+    del_uz.setZero();
+
+    Eigen::VectorXd GX_X(1);
+    GX_X = Gx * (preview_x_mj - preview_x_b_mj);
+    Eigen::VectorXd GX_Y(1);
+    GX_Y = Gx * (preview_y_mj - preview_y_b_mj);
+    Eigen::VectorXd GX_Z(1);
+    GX_Z = Gx * (preview_z_mj - preview_z_b_mj);
+
+    if (walking_tick_ == 0)
+    {
+        del_zmp.setZero();
+        cout << "del_zmp : " << del_zmp(0) << "," << del_zmp(1) << endl;
+    }
+
+    del_ux(0, 0) = -(vx(0) - ref_vrp_(tick,0)) * Gi(0, 0) - GX_X(0) - sum_Gd_vx_ref;
+    del_uy(0, 0) = -(vy(0) - ref_vrp_(tick,1)) * Gi(0, 0) - GX_Y(0) - sum_Gd_vy_ref;
+    del_uz(0, 0) = -(vz(0) - ref_vrp_(tick,1)) * Gi(0, 0) - GX_Z(0) - sum_Gd_vz_ref;
+
+    UX = UX + del_ux(0, 0);
+    UY = UY + del_uy(0, 0);
+    //UZ = UZ + del_uz(0, 0);
+
+    XD = A * preview_x_mj + B * UX;
+    YD = A * preview_y_mj + B * UY;    
+    //ZD = A * preview_z_mj + B * UZ;    
+
+    dcm_desired_(0) = XD(0) + XD(1) / w_;
+    dcm_desired_(1) = YD(0) + YD(1) / w_; 
+    //dcm_desired_(2) = ZD(0) + ZD(1) / w_; 
 
     // MJ_graph << XD(0) << "," << YD(0) << "," << ZMP_X_REF_ << "," << ZMP_Y_REF_ << "," << cp_desired_(0) << "," << cp_desired_(1) << endl;
 }
@@ -10700,6 +10814,99 @@ e_tmp_graph24 << data_save_calc.transpose() << endl;
 }
 
 ////////////////////// Econom2 function end
+void AvatarController::getComTrajectory_FIPM()
+{
+    if (walking_tick_ == 0)
+    {
+        Gi_mj_.setZero();
+        Gx_mj_.setZero();
+        Gd_mj_.setZero();
+        preview_Parameter(1.0 / hz_, 16 * hz_ / 10, Gi_mj_, Gd_mj_, Gx_mj_, A_mj_, B_mj_, C_mj_);
+        xs_mj_(0) = xi_mj_;
+        xs_mj_(1) = 0;
+        xs_mj_(2) = 0;
+        ys_mj_(0) = yi_mj_;
+        ys_mj_(1) = 0;
+        ys_mj_(2) = 0;
+        zs_mj_(0) = zc_mj_;
+        zs_mj_(1) = 0;
+        zs_mj_(2) = 0;
+        UX_mj_ = 0;
+        UY_mj_ = 0;
+        UZ_mj_ = 0;
+        xd_mj_ = xs_mj_;
+        //yd_mj_ = ys_mj_;
+        zd_mj_ = zs_mj_;
+
+        MPC_Stabilizer_state_main_.setZero(9);
+    }
+
+    vrp_start_time_ = ((bool)current_step_num_)*t_start_;
+
+    previewcontroller_FIPM(1/hz_, int(1.6*hz_), walking_tick_ - vrp_start_time_, xi_mj_, yi_mj_, zc_mj_, xs_mj_, ys_mj_, zs_mj_, UX_mj_, UY_mj_, UZ_mj_, Gi_mj_, Gd_mj_, Gx_mj_, A_mj_, B_mj_, C_mj_, xd_mj_, yd_mj_, zd_mj_);
+
+    xs_mj_ = xd_mj_;
+    ys_mj_ = yd_mj_;
+    zs_mj_ = zd_mj_;
+
+    com_desired_(0) = xd_mj_(0);
+    com_desired_(1) = yd_mj_(0);
+    com_desired_(2) = zd_mj_(0);
+
+    MPC_Stabilizer_state_main_(0) = com_desired_(0);
+    MPC_Stabilizer_state_main_(3) = com_desired_(1);
+    MPC_Stabilizer_state_main_(6) = com_desired_(2);
+
+    Eigen::Vector3d vrp_ref;
+    vrp_ref(0) = ref_vrp_(walking_tick_ - (bool)current_step_num_*t_start_, 0);
+    vrp_ref(1) = ref_vrp_(walking_tick_ - (bool)current_step_num_*t_start_, 1);
+    vrp_ref(2) = ref_vrp_(walking_tick_ - (bool)current_step_num_*t_start_, 2);
+
+    MPC_Stabilizer_state_main_(2) = vrp_ref(0) + 1.40*(dcm_measured_(0) - dcm_desired_(0));
+    MPC_Stabilizer_state_main_(5) = vrp_ref(1) + 1.30*(dcm_measured_(1) - dcm_desired_(1));
+    MPC_Stabilizer_state_main_(8) = vrp_ref(2) + 1.01*(dcm_measured_(2) - dcm_desired_(2));
+
+    if (walking_tick_ == t_start_ + t_total_ - 1 && current_step_num_ != total_step_num_ - 1)
+    {
+        Eigen::Vector3d com_pos_prev;
+        Eigen::Vector3d com_pos;
+        Eigen::Vector3d com_vel_prev;
+        Eigen::Vector3d com_vel;
+        Eigen::Vector3d com_acc_prev;
+        Eigen::Vector3d com_acc;
+        Eigen::Matrix3d frame_rot_diff;
+        Eigen::Vector3d frame_pos_diff;
+
+        frame_rot_diff = DyrosMath::rotateWithZ(-foot_step_support_frame_(current_step_num_, 5));
+        for (int i = 0; i < 3; i++)
+            frame_pos_diff(i) = foot_step_support_frame_(current_step_num_, i);
+        
+        frame_pos_diff(0) = frame_pos_diff(0) + modified_del_zmp_(current_step_num_,0); // 왼발 오른발 나눌까?
+        frame_pos_diff(1) = frame_pos_diff(1) + modified_del_zmp_(current_step_num_,1);  
+        
+        com_pos_prev(0) = xs_mj_(0);
+        com_pos_prev(1) = ys_mj_(0);
+        com_pos = frame_rot_diff * (com_pos_prev - frame_pos_diff);
+
+        com_vel_prev(0) = xs_mj_(1);
+        com_vel_prev(1) = ys_mj_(1);
+        com_vel_prev(2) = 0.0;
+        com_vel = frame_rot_diff * com_vel_prev;
+
+        com_acc_prev(0) = xs_mj_(2);
+        com_acc_prev(1) = ys_mj_(2);
+        com_acc_prev(2) = 0.0;
+        com_acc = frame_rot_diff * com_acc_prev;
+
+        xs_mj_(0) = com_pos(0);
+        ys_mj_(0) = com_pos(1);
+        xs_mj_(1) = com_vel(0);
+        ys_mj_(1) = com_vel(1);
+        xs_mj_(2) = com_acc(0);
+        ys_mj_(2) = com_acc(1);
+    }
+}
+
 void AvatarController::getComTrajectory()
 {
     if (walking_tick_ == 0)
@@ -10714,8 +10921,12 @@ void AvatarController::getComTrajectory()
         ys_mj_(0) = yi_mj_;
         ys_mj_(1) = 0;
         xs_mj_(2) = 0;
+        zs_mj_(0) = zc_mj_;
+        zs_mj_(1) = 0;
+        zs_mj_(2) = 0;
         UX_mj_ = 0;
         UY_mj_ = 0;
+        UZ_mj_ = 0;
         xd_mj_ = xs_mj_;
 
         MPC_Stabilizer_state_main_.setZero(9);
@@ -10727,21 +10938,24 @@ void AvatarController::getComTrajectory()
 
     xs_mj_ = xd_mj_;
     ys_mj_ = yd_mj_;
+    zs_mj_ = zd_mj_;
 
     com_desired_(0) = xd_mj_(0);
     com_desired_(1) = yd_mj_(0);
     com_desired_(2) = zc_mj_;
 
-    dcm_desired_(0) = cp_desired_(0);
-    dcm_desired_(1) = cp_desired_(1);
-
     MPC_Stabilizer_state_main_(0) = com_desired_(0);
     MPC_Stabilizer_state_main_(3) = com_desired_(1);
     MPC_Stabilizer_state_main_(6) = com_desired_(2);
 
-    MPC_Stabilizer_state_main_(2) = zmp_ref_(0) + 1.40*(dcm_measured_(0) - cp_desired_(0));
-    MPC_Stabilizer_state_main_(5) = zmp_ref_(1) + 1.30*(dcm_measured_(1) - cp_desired_(1));
-    MPC_Stabilizer_state_main_(8) = zc_mj_      + 1.01*(dcm_measured_(2) - zc_mj_);
+    Eigen::Vector3d vrp_ref;
+    vrp_ref(0) = ref_vrp_(walking_tick_ - (bool)current_step_num_*t_start_, 0);
+    vrp_ref(1) = ref_vrp_(walking_tick_ - (bool)current_step_num_*t_start_, 1);
+    vrp_ref(2) = ref_vrp_(walking_tick_ - (bool)current_step_num_*t_start_, 2);
+    
+    MPC_Stabilizer_state_main_(2) = vrp_ref(0) + 1.40*(dcm_measured_(0) - dcm_desired_(0));
+    MPC_Stabilizer_state_main_(5) = vrp_ref(1) + 1.30*(dcm_measured_(1) - dcm_desired_(1));
+    MPC_Stabilizer_state_main_(8) = vrp_ref(2) + 1.01*(dcm_measured_(2) - zc_mj_);
 
     if (walking_tick_ == t_start_ + t_total_ - 1 && current_step_num_ != total_step_num_ - 1)
     {
@@ -11044,31 +11258,24 @@ void AvatarController::CP_compen_MJ_FT()
     double ZMP_Y_DES_CALC = 0.0;
     double lambda_desired = 0.0;
 
-    ZMP_Y_REF_alpha_ = ref_zmp_wo_offset_(walking_tick_ - ((bool)current_step_num_)*t_start_, 1);
-
-    del_zmp(0) = MPC_Stabilizer_state_main_(2) - ZMP_X_REF_;
-    del_zmp(1) = MPC_Stabilizer_state_main_(5) - ZMP_Y_REF_alpha_;
-
-    del_zmp(0) = DyrosMath::minmax_cut(del_zmp(0), - zmp_x_min_foot_width_, zmp_x_max_foot_width_);
-    del_zmp(1) = DyrosMath::minmax_cut(del_zmp(1), - zmp_y_min_foot_width_, zmp_y_max_foot_width_); 
-
-    Eigen::Vector2d ZMP_calc_real; ZMP_calc_real.setZero();
-    ZMP_calc_real(0) = ZMP_X_REF_       + del_zmp(0);
-    ZMP_calc_real(1) = ZMP_Y_REF_alpha_ + del_zmp(1);
+    double X_foot_Center = ref_zmp_wo_offset_(walking_tick_ - ((bool)current_step_num_)*t_start_, 0);
+    double Y_foot_Center = ref_zmp_wo_offset_(walking_tick_ - ((bool)current_step_num_)*t_start_, 1);
 
     lambda_desired = (com_support_current_(2) - MPC_Stabilizer_state_main_(8) + GRAVITY*b_*b_)/(com_support_current_(2)*b_*b_);
-    ZMP_X_DES_CALC = (ZMP_calc_real(0) - (1 - lambda_desired*b_*b_)*com_support_current_(0))/(lambda_desired*b_*b_);
-    ZMP_Y_DES_CALC = (ZMP_calc_real(1) - (1 - lambda_desired*b_*b_)*com_support_current_(1))/(lambda_desired*b_*b_);
+    ZMP_X_DES_CALC = (MPC_Stabilizer_state_main_(2) - (1 - lambda_desired*b_*b_)*com_support_current_(0))/(lambda_desired*b_*b_);
+    ZMP_Y_DES_CALC = (MPC_Stabilizer_state_main_(5) - (1 - lambda_desired*b_*b_)*com_support_current_(1))/(lambda_desired*b_*b_);
 
     //lambda_desired = (MPC_Stabilizer_state_main_(6) - MPC_Stabilizer_state_main_(8) + GRAVITY*b_*b_)/(MPC_Stabilizer_state_main_(6)*b_*b_);
     //ZMP_X_DES_CALC = (ZMP_calc_real(0) - (1 - lambda_desired*b_*b_)*MPC_Stabilizer_state_main_(0))/(lambda_desired*b_*b_);
     //ZMP_Y_DES_CALC = (ZMP_calc_real(1) - (1 - lambda_desired*b_*b_)*MPC_Stabilizer_state_main_(3))/(lambda_desired*b_*b_);
 
+    ZMP_X_DES_CALC = DyrosMath::minmax_cut(ZMP_X_DES_CALC, X_foot_Center - zmp_x_min_foot_width_, X_foot_Center + zmp_x_max_foot_width_);
+    ZMP_Y_DES_CALC = DyrosMath::minmax_cut(ZMP_Y_DES_CALC, Y_foot_Center - zmp_y_min_foot_width_, Y_foot_Center + zmp_y_max_foot_width_);
+
     double calc_z_max = 0.075;
     alpha = (ZMP_Y_DES_CALC - (rfoot_support_current_.translation()(1) + calc_z_max)) / ((lfoot_support_current_.translation()(1) - calc_z_max) - (rfoot_support_current_.translation()(1) + calc_z_max));
-    ZMP_Y_DES_CALC = ZMP_Y_REF_alpha_ + del_zmp(1);
     
-    e_tmp_graph1 << cp_desired_(1) << "," << cp_measured_(1) << "," << ZMP_Y_DES_CALC << "," << com_support_current_(1) << "," << ZMP_calc_real(1) << ","
+    e_tmp_graph1 << cp_desired_(1) << "," << cp_measured_(1) << "," << ZMP_Y_DES_CALC << "," << com_support_current_(1) << ","
                  << lfoot_trajectory_support_.translation()(2) << "," << rfoot_trajectory_support_.translation()(2) << ","
                  << endl;
 
