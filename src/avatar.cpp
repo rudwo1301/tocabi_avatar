@@ -8,7 +8,6 @@ ofstream e_mpc_time_graph4    ("/home/econom2-20/data/e_mpc_time_graph4.txt");
 ofstream e_main_time_graph    ("/home/econom2-20/data/e_main_time_graph.txt");
 ofstream e_mpc_planner_data   ("/home/econom2-20/data/e_mpc_planner_data.txt");
 ofstream e_mpc_stabilizer_data("/home/econom2-20/data/e_mpc_stabilizer_data.txt");
-
 ofstream e_tmp_graph1         ("/home/econom2-20/data/e_tmp_graph1.txt");
 ofstream e_tmp_graph2         ("/home/econom2-20/data/e_tmp_graph2.txt");
 ofstream e_tmp_graph3         ("/home/econom2-20/data/e_tmp_graph3.txt");
@@ -605,7 +604,7 @@ void AvatarController::computeSlow()
             if (current_step_num_ < total_step_num_)
             {   
                 getZmpTrajectory();
-                mpc_on_bool_ = false;
+                //mpc_on_bool_ = false;
                 if(mpc_on_bool_)
                 {
                     getComTrajectory_mpc();
