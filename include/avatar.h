@@ -1082,6 +1082,7 @@ public:
     void getRobotState();
     void calculateFootStepTotal();
     void calculateFootStepTotal_MJ();
+    void calculateFootStepTotal_ec2();
     void supportToFloatPattern();
     void floatToSupportFootstep();
     void GravityCalculate_MJ();
@@ -1321,6 +1322,9 @@ public:
     double target_z_;
     double com_height_;
     int is_right_foot_swing_;
+    
+    Eigen::VectorXd height_diff_vec_;
+    Eigen::VectorXd height_diff_terrain_vec_;
 
     int total_step_num_;
     int total_step_num_mpc_;
@@ -1392,10 +1396,13 @@ public:
     double param_ext_force_;
     double param_ext_theta_;
     int    param_scenario_;
+    bool   param_stepping_stone_;
+    bool   param_loco_manipulation_;
 
-    double zmp_x_max = 0.16;
+    //double zmp_x_max = 0.16;
+    double zmp_x_max = 0.11;
     //double zmp_x_min = 0.10;
-    double zmp_x_min = 0.10;
+    double zmp_x_min = 0.05;
     double zmp_x_max_foot_width_ = 0.18;
     double zmp_x_min_foot_width_ = 0.12;
     //double zmp_y_max = 0.10;
