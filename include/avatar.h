@@ -1690,6 +1690,9 @@ public:
     Eigen::VectorVQd Kp_virtual_;
     Eigen::VectorVQd Kd_virtual_;
 
+    Eigen::VectorVQd Kp_dyn_;
+    Eigen::VectorVQd Kd_dyn_;
+
     Eigen::Isometry3d lhand_trajectory_float_;
     Eigen::Isometry3d rhand_trajectory_float_;
     Eigen::Isometry3d chest_trajectory_float_;

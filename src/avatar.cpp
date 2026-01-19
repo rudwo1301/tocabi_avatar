@@ -792,8 +792,8 @@ void AvatarController::computeSlow()
         }
 
         //WBD
-        Eigen::VectorQd torque_sum = torque_wbd_ + (Kp_virtual_.asDiagonal()*q_error_virtual_ - Kd_virtual_.asDiagonal()*rd_.q_dot_virtual_).segment(6, MODEL_DOF);
-
+        //Eigen::VectorQd torque_sum = torque_wbd_ + (Kp_virtual_.asDiagonal()*q_error_virtual_ - Kd_virtual_.asDiagonal()*rd_.q_dot_virtual_).segment(6, MODEL_DOF);
+        Eigen::VectorQd torque_sum = torque_wbd_ + Kp.asDiagonal()*q_error_virtual_.segment(6, MODEL_DOF) - Kd.asDiagonal()*rd_.q_dot_virtual_.segment(6, MODEL_DOF);
         for(int i = 0; i < MODEL_DOF; i ++)
         {
             torque_sum(i) = DyrosMath::minmax_cut(torque_sum(i), -rd_.torque_limit(i), rd_.torque_limit(i));
@@ -801,8 +801,6 @@ void AvatarController::computeSlow()
 
         ///////////////////////////////FINAL TORQUE COMMAND/////////////////////////////
         torque_desired_prev_ = torque_sum;
-
-        e_tmp_graph1 << torque_sum.transpose() << endl;
 
         rd_.torque_desired   = torque_sum;
         ///////////////////////////////////////////////////////////////////////////////
@@ -6936,9 +6934,9 @@ void AvatarController::calculateFootStepTotal_ec2()
         //random height variation
         if (i % 3 == 0)
         { 
-            height_diff_vec_(i)     = 0.15 * 0.01 * ((int)num % 100);
-            height_diff_vec_(i + 1) = height_diff_vec_(i);
-            height_diff_vec_(i + 2) = height_diff_vec_(i);
+            //height_diff_vec_(i)     = 0.15 * 0.01 * ((int)num % 100);
+            //height_diff_vec_(i + 1) = height_diff_vec_(i);
+            //height_diff_vec_(i + 2) = height_diff_vec_(i);
         }
         if(param_stepping_stone_) { height_diff_vec_(i) = 0.10; }
     }
@@ -7384,163 +7382,77 @@ void AvatarController::floatToSupportFootstep()
 
 void AvatarController::Joint_gain_set_MJ()
 {
-    //simulation gains
-    if(param_sim_mode_)
-    {
-        Kp(0) = 1800.0;
-        Kd(0) = 70.0; // Left Hip yaw
-        Kp(1) = 2100.0;
-        Kd(1) = 90.0; // Left Hip roll
-        Kp(2) = 2100.0;
-        Kd(2) = 90.0; // Left Hip pitch
-        Kp(3) = 2100.0;
-        Kd(3) = 90.0; // Left Knee pitch
-        Kp(4) = 2100.0;
-        Kd(4) = 90.0; // Left Ankle pitch
-        //Kp(5) = 2100.0;
-        //Kd(5) = 90.0; // Left Ankle roll
-        Kp(5) = 4000.0;
-        Kd(5) = 65.0; // Left Ankle roll
+    Kp(0) = 1800.0;
+    Kd(0) = 70.0; // Left Hip yaw
+    Kp(1) = 2100.0;
+    Kd(1) = 90.0; // Left Hip roll
+    Kp(2) = 2100.0;
+    Kd(2) = 90.0; // Left Hip pitch
+    Kp(3) = 2100.0;
+    Kd(3) = 90.0; // Left Knee pitch
+    Kp(4) = 2100.0;
+    Kd(4) = 90.0; // Left Ankle pitch
+    Kp(5) = 4000.0;
+    Kd(5) = 65.0; // Left Ankle roll
 
-        Kp(6) = 1800.0;
-        Kd(6) = 70.0; // Right Hip yaw
-        Kp(7) = 2100.0;
-        Kd(7) = 90.0; // Right Hip roll
-        Kp(8) = 2100.0;
-        Kd(8) = 90.0; // Right Hip pitch
-        Kp(9) = 2100.0;
-        Kd(9) = 90.0; // Right Knee pitch
-        Kp(10) = 2100.0;
-        Kd(10) = 90.0; // Right Ankle pitch
-        //Kp(11) = 2100.0;
-        //Kd(11) = 90.0; // Right Ankle roll
-        Kp(11) = 4000.0;
-        Kd(11) = 65.0; // Right Ankle roll
+    Kp(6) = 1800.0;
+    Kd(6) = 70.0; // Right Hip yaw
+    Kp(7) = 2100.0;
+    Kd(7) = 90.0; // Right Hip roll
+    Kp(8) = 2100.0;
+    Kd(8) = 90.0; // Right Hip pitch
+    Kp(9) = 2100.0;
+    Kd(9) = 90.0; // Right Knee pitch
+    Kp(10) = 2100.0;
+    Kd(10) = 90.0; // Right Ankle pitch
+    Kp(11) = 4000.0;
+    Kd(11) = 65.0; // Right Ankle roll
 
-        Kp(12) = 2200.0;
-        Kd(12) = 90.0; // Waist yaw
-        Kp(13) = 2200.0;
-        Kd(13) = 90.0; // Waist pitch
-        Kp(14) = 2200.0;
-        Kd(14) = 90.0; // Waist roll
+    Kp(12) = 3600.0;
+    Kd(12) = 100.0; // Waist yaw
+    Kp(13) = 3600.0;
+    Kd(13) = 100.0; // Waist pitch
+    Kp(14) = 3600.0;
+    Kd(14) = 100.0; // Waist roll
 
-        Kp(15) = 400.0;
-        Kd(15) = 10.0;
-        Kp(16) = 800.0;
-        Kd(16) = 10.0;
-        Kp(17) = 400.0;
-        Kd(17) = 10.0;
-        Kp(18) = 400.0;
-        Kd(18) = 10.0;
-        Kp(19) = 250.0;
-        Kd(19) = 2.5;
-        Kp(20) = 250.0;
-        Kd(20) = 2.0;
-        Kp(21) = 50.0;
-        Kd(21) = 2.0; // Left Wrist
-        Kp(22) = 50.0;
-        Kd(22) = 2.0; // Left Wrist
+    Kp(15) = 400.0;
+    Kd(15) = 10.0;
+    Kp(16) = 800.0;
+    Kd(16) = 10.0;
+    Kp(17) = 400.0;
+    Kd(17) = 10.0;
+    Kp(18) = 400.0;
+    Kd(18) = 10.0;
+    Kp(19) = 250.0;
+    Kd(19) = 10.0;
+    Kp(20) = 250.0;
+    Kd(20) = 10.0;
+    Kp(21) = 50.0;
+    Kd(21) = 1.0; // Left Wrist
+    Kp(22) = 50.0;
+    Kd(22) = 1.0; // Left Wrist
 
-        Kp(23) = 50.0;
-        Kd(23) = 2.0; // Neck
-        Kp(24) = 50.0;
-        Kd(24) = 2.0; // Neck
+    Kp(23) = 100.0;
+    Kd(23) = 2.0; // Neck
+    Kp(24) = 100.0;
+    Kd(24) = 2.0; // Neck
 
-        Kp(25) = 400.0;
-        Kd(25) = 10.0;
-        Kp(26) = 800.0;
-        Kd(26) = 10.0;
-        Kp(27) = 400.0;
-        Kd(27) = 10.0;
-        Kp(28) = 400.0;
-        Kd(28) = 10.0;
-        Kp(29) = 250.0;
-        Kd(29) = 2.5;
-        Kp(30) = 250.0;
-        Kd(30) = 2.0;
-        Kp(31) = 50.0;
-        Kd(31) = 2.0; // Right Wrist
-        Kp(32) = 50.0;
-        Kd(32) = 2.0; // Right Wrist
-
-        cout << "simulation joint gain set" << endl;
-    }
-    else
-    {
-        Kp(0) = 2000.0;
-        Kd(0) = 20.0; // Left Hip yaw
-        Kp(1) = 5000.0;
-        Kd(1) = 55.0; // Left Hip roll //55
-        Kp(2) = 4000.0;
-        Kd(2) = 45.0; // Left Hip pitch
-        Kp(3) = 3700.0;
-        Kd(3) = 40.0; // Left Knee pitch
-        Kp(4) = 4000.0; // 5000
-        Kd(4) = 65.0; // Left Ankle pitch /5000 / 30  //55
-        Kp(5) = 4000.0; // 5000
-        Kd(5) = 65.0; // Left Ankle roll /5000 / 30 //55
-
-        Kp(6) = 2000.0;
-        Kd(6) = 20.0; // Right Hip yaw
-        Kp(7) = 5000.0;
-        Kd(7) = 55.0; // Right Hip roll  //55
-        Kp(8) = 4000.0;
-        Kd(8) = 45.0; // Right Hip pitch
-        Kp(9) = 3700.0;
-        Kd(9) = 40.0; // Right Knee pitch
-        Kp(10) = 4000.0; // 5000
-        Kd(10) = 65.0; // Right Ankle pitch //55
-        Kp(11) = 4000.0; // 5000
-        Kd(11) = 65.0; // Right Ankle roll //55
-
-        Kp(12) = 6000.0;
-        Kd(12) = 200.0; // Waist yaw
-        Kp(13) = 10000.0;
-        Kd(13) = 100.0; // Waist pitch
-        Kp(14) = 10000.0;
-        Kd(14) = 100.0; // Waist roll
-
-        Kp(15) = 400.0;
-        Kd(15) = 10.0;
-        Kp(16) = 800.0;
-        Kd(16) = 10.0;
-        Kp(17) = 400.0;
-        Kd(17) = 10.0;
-        Kp(18) = 400.0;
-        Kd(18) = 10.0;
-        Kp(19) = 250.0;
-        Kd(19) = 2.5;
-        Kp(20) = 250.0;
-        Kd(20) = 2.0;
-        Kp(21) = 50.0;
-        Kd(21) = 2.0; // Left Wrist
-        Kp(22) = 50.0;
-        Kd(22) = 2.0; // Left Wrist
-
-        Kp(23) = 50.0;
-        Kd(23) = 2.0; // Neck
-        Kp(24) = 50.0;
-        Kd(24) = 2.0; // Neck
-
-        Kp(25) = 400.0;
-        Kd(25) = 10.0;
-        Kp(26) = 800.0;
-        Kd(26) = 10.0;
-        Kp(27) = 400.0;
-        Kd(27) = 10.0;
-        Kp(28) = 400.0;
-        Kd(28) = 10.0;
-        Kp(29) = 250.0;
-        Kd(29) = 2.5;
-        Kp(30) = 250.0;
-        Kd(30) = 2.0;
-        Kp(31) = 50.0;
-        Kd(31) = 2.0; // Right Wrist
-        Kp(32) = 50.0;
-        Kd(32) = 2.0; // Right Wrist
-
-        cout << "experiment joint gain set" << endl;
-    }
+    Kp(25) = 400.0;
+    Kd(25) = 10.0;
+    Kp(26) = 800.0;
+    Kd(26) = 10.0;
+    Kp(27) = 400.0;
+    Kd(27) = 10.0;
+    Kp(28) = 400.0;
+    Kd(28) = 10.0;
+    Kp(29) = 250.0;
+    Kd(29) = 10.0;
+    Kp(30) = 250.0;
+    Kd(30) = 10.0;
+    Kp(31) = 50.0;
+    Kd(31) = 1.0; // Right Wrist
+    Kp(32) = 50.0;
+    Kd(32) = 1.0; // Right Wrist
 
     Kp_virtual_(0) = 100;
     Kd_virtual_(0) =  20;
@@ -7555,8 +7467,88 @@ void AvatarController::Joint_gain_set_MJ()
     Kp_virtual_(5) = 100;
     Kd_virtual_(5) =  20;
 
-    Kp_virtual_.segment(6, MODEL_DOF) = Kp;
-    Kd_virtual_.segment(6, MODEL_DOF) = Kd;
+    if(param_sim_mode_)
+    {
+        Kp_virtual_.segment(6, MODEL_DOF) = Kp;
+        Kd_virtual_.segment(6, MODEL_DOF) = Kd;
+        cout << "simulation joint gain set" << endl;
+    }
+    else
+    {
+        Kp_virtual_( 0 + 6) = 1800.0;
+        Kd_virtual_( 0 + 6) = 70.0;
+        Kp_virtual_( 1 + 6) = 5000.0;
+        Kd_virtual_( 1 + 6) = 50.0;
+        Kp_virtual_( 2 + 6) = 5000.0;
+        Kd_virtual_( 2 + 6) = 50.0;
+        Kp_virtual_( 3 + 6) = 5000.0;
+        Kd_virtual_( 3 + 6) = 50.0;
+        Kp_virtual_( 4 + 6) = 5000.0;
+        Kd_virtual_( 4 + 6) = 50.0;
+        Kp_virtual_( 5 + 6) = 5000.0;
+        Kd_virtual_( 5 + 6) = 50.0;
+
+        Kp_virtual_( 6 + 6) = 1800.0;
+        Kd_virtual_( 6 + 6) = 70.0;
+        Kp_virtual_( 7 + 6) = 5000.0;
+        Kd_virtual_( 7 + 6) = 50.0;
+        Kp_virtual_( 8 + 6) = 5000.0;
+        Kd_virtual_( 8 + 6) = 50.0;
+        Kp_virtual_( 9 + 6) = 5000.0;
+        Kd_virtual_( 9 + 6) = 50.0;
+        Kp_virtual_(10 + 6) = 5000.0;
+        Kd_virtual_(10 + 6) = 50.0;
+        Kp_virtual_(11 + 6) = 5000.0;
+        Kd_virtual_(11 + 6) = 50.0;
+
+        Kp_virtual_(12 + 6) = 3600.0;
+        Kd_virtual_(12 + 6) = 100.0;
+        Kp_virtual_(13 + 6) = 3600.0;
+        Kd_virtual_(13 + 6) = 100.0;
+        Kp_virtual_(14 + 6) = 3600.0;
+        Kd_virtual_(14 + 6) = 100.0;
+
+        Kp_virtual_(15 + 6) = 400.0;
+        Kd_virtual_(15 + 6) = 10.0;
+        Kp_virtual_(16 + 6) = 800.0;
+        Kd_virtual_(16 + 6) = 10.0;
+        Kp_virtual_(17 + 6) = 400.0;
+        Kd_virtual_(17 + 6) = 10.0;
+        Kp_virtual_(18 + 6) = 400.0;
+        Kd_virtual_(18 + 6) = 10.0;
+        Kp_virtual_(19 + 6) = 250.0;
+        Kd_virtual_(19 + 6) = 10.0;
+        Kp_virtual_(20 + 6) = 250.0;
+        Kd_virtual_(20 + 6) = 10.0;
+        Kp_virtual_(21 + 6) = 800.0;
+        Kd_virtual_(21 + 6) = 10.0;
+        Kp_virtual_(22 + 6) = 20000.0;
+        Kd_virtual_(22 + 6) = 100.0;
+
+        Kp_virtual_(23 + 6) = 100.0;
+        Kd_virtual_(23 + 6) = 2.0;
+        Kp_virtual_(24 + 6) = 100.0;
+        Kd_virtual_(24 + 6) = 2.0;
+
+        Kp_virtual_(25 + 6) = 400.0;
+        Kd_virtual_(25 + 6) = 10.0;
+        Kp_virtual_(26 + 6) = 800.0;
+        Kd_virtual_(26 + 6) = 10.0;
+        Kp_virtual_(27 + 6) = 400.0;
+        Kd_virtual_(27 + 6) = 10.0;
+        Kp_virtual_(28 + 6) = 400.0;
+        Kd_virtual_(28 + 6) = 10.0;
+        Kp_virtual_(29 + 6) = 250.0;
+        Kd_virtual_(29 + 6) = 10.0;
+        Kp_virtual_(30 + 6) = 250.0;
+        Kd_virtual_(30 + 6) = 10.0;
+        Kp_virtual_(31 + 6) = 800.0;
+        Kd_virtual_(31 + 6) = 10.0;
+        Kp_virtual_(32 + 6) = 20000.0;
+        Kd_virtual_(32 + 6) = 100.0;
+
+        cout << "experiment joint gain set" << endl;
+    }
 }
 
 void AvatarController::addZmpOffset()
@@ -7970,8 +7962,7 @@ void AvatarController::onestepVrpZ(unsigned int current_step_number, double t_to
 
     double height_diff = 0.0;
     
-    if(walking_tick_ == t_start_)
-    { cout << "height_diff_vec_: " << height_diff_vec_.transpose() << endl; }
+    //if(walking_tick_ == t_start_) { cout << "height_diff_vec_: " << height_diff_vec_.transpose() << endl; }
 
     for(int i = 0; i < total_step_num_; i++) { if(current_step_number == i) { height_diff = - height_diff_vec_(i); } }
 
@@ -11903,23 +11894,23 @@ Eigen::VectorQd AvatarController::MitWholebodyInverseDynamicsController(const Ei
     J_contact_dot.topRows(6)    = J_lfoot_dot_;
     J_contact_dot.bottomRows(6) = J_rfoot_dot_;
 
-    double W_qb_x     = 1000.0;
-    double W_qb_y     = 1000.0;
-    double W_qb_z     = 1000.0;
-    double W_qb_roll  = 1000.0;
-    double W_qb_pitch = 1000.0;
-    double W_qb_yaw   = 1000.0;
+    double W_qb_x     = 2000.0;
+    double W_qb_y     = 2000.0;
+    double W_qb_z     = 2000.0;
+    double W_qb_roll  = 2000.0;
+    double W_qb_pitch = 2000.0;
+    double W_qb_yaw   = 2000.0;
 
     double W_qa       = 2000.0;
 
-    double W_torque_1 = 100.0;
+    double W_torque_1 = 000.0;
     double W_torque_2 = 2500.0;
     //double W_c_lfoot  = 1.0;
     //double W_c_rfoot  = 1.0;
     double W_c_lfoot  = 0.0;
     double W_c_rfoot  = 0.0;
     double W_f_lfoot  = 2000.0;
-    double W_f_rfoot  = 200;
+    double W_f_rfoot  = 2000.0;
 
     //if(is_dsp_fast_)    
     //{
@@ -11954,7 +11945,7 @@ Eigen::VectorQd AvatarController::MitWholebodyInverseDynamicsController(const Ei
     //q_ddot_, torque, contact_accel, contact_force
     //q_ddot_
     for(int i = 6; i < control_size_qddot; ++i) {W_q(i,i) = W_qa;}
-    H_wbid.block(H_idx, H_idx, control_size_qddot, control_size_qddot) = W_q + 0.1*rd_.A_;
+    H_wbid.block(H_idx, H_idx, control_size_qddot, control_size_qddot) = W_q + 0.2*rd_.A_;
     H_idx += control_size_qddot;
     //torque_
     H_wbid.block(H_idx, H_idx, control_size_torque, control_size_torque) = (W_torque_1 + W_torque_2)*Eigen::MatrixXd::Identity(control_size_torque, control_size_torque);
