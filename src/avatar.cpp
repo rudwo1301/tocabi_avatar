@@ -750,7 +750,7 @@ void AvatarController::computeSlow()
 
         //WBD
         //Eigen::VectorQd torque_sum = torque_wbd_ + Kp.asDiagonal()*q_error_virtual_.segment(6, MODEL_DOF) - Kd.asDiagonal()*rd_.q_dot_virtual_.segment(6, MODEL_DOF);
-        q_error_virtual_.segment(6, 12).setZero();
+        //q_error_virtual_.segment(6, 12).setZero();
         //q_error_virtual_.segment(6, MODEL_DOF).setZero();
         Eigen::VectorQd torque_pd  = Kp.asDiagonal() * q_error_virtual_.segment(6, MODEL_DOF)
                                    - Kd.asDiagonal() * rd_.q_dot_;
@@ -7305,38 +7305,38 @@ void AvatarController::floatToSupportFootstep()
 
 void AvatarController::Joint_gain_set_MJ()
 {
-    Kp( 0) = 1800.0;
-    Kd( 0) = 70.0; // Left Hip yaw
-    Kp( 1) = 2100.0;
-    Kd( 1) = 90.0; // Left Hip roll
-    Kp( 2) = 2100.0;
-    Kd( 2) = 90.0; // Left Hip pitch
-    Kp( 3) = 2100.0;
-    Kd( 3) = 90.0; // Left Knee pitch
-    Kp( 4) = 2100.0;
-    Kd( 4) = 90.0; // Left Ankle pitch
-    Kp( 5) = 4000.0;
-    Kd( 5) = 65.0; // Left Ankle roll
+    Kp(0) = 1800.0;
+    Kd(0) = 70.0; // Left Hip yaw
+    Kp(1) = 2100.0;
+    Kd(1) = 90.0; // Left Hip roll
+    Kp(2) = 2100.0;
+    Kd(2) = 90.0; // Left Hip pitch
+    Kp(3) = 2100.0;
+    Kd(3) = 90.0; // Left Knee pitch
+    Kp(4) = 2100.0;
+    Kd(4) = 90.0; // Left Ankle pitch
+    Kp(5) = 4000.0;
+    Kd(5) = 65.0; // Left Ankle roll
 
-    Kp( 6) = 1800.0;
-    Kd( 6) = 70.0; // Right Hip yaw
-    Kp( 7) = 2100.0;
-    Kd( 7) = 90.0; // Right Hip roll
-    Kp( 8) = 2100.0;
-    Kd( 8) = 90.0; // Right Hip pitch
-    Kp( 9) = 2100.0;
-    Kd( 9) = 90.0; // Right Knee pitch
+    Kp(6) = 1800.0;
+    Kd(6) = 70.0; // Right Hip yaw
+    Kp(7) = 2100.0;
+    Kd(7) = 90.0; // Right Hip roll
+    Kp(8) = 2100.0;
+    Kd(8) = 90.0; // Right Hip pitch
+    Kp(9) = 2100.0;
+    Kd(9) = 90.0; // Right Knee pitch
     Kp(10) = 2100.0;
     Kd(10) = 90.0; // Right Ankle pitch
     Kp(11) = 4000.0;
     Kd(11) = 65.0; // Right Ankle roll
 
-    Kp(12) = 3600.0;
-    Kd(12) = 100.0; // Waist yaw
-    Kp(13) = 3600.0;
-    Kd(13) = 100.0; // Waist pitch
-    Kp(14) = 3600.0;
-    Kd(14) = 100.0; // Waist roll
+    Kp(12) = 2200.0;
+    Kd(12) = 90.0; // Waist yaw
+    Kp(13) = 2200.0;
+    Kd(13) = 90.0; // Waist pitch
+    Kp(14) = 2200.0;
+    Kd(14) = 90.0; // Waist roll
 
     Kp(15) = 400.0;
     Kd(15) = 10.0;
@@ -7347,18 +7347,18 @@ void AvatarController::Joint_gain_set_MJ()
     Kp(18) = 400.0;
     Kd(18) = 10.0;
     Kp(19) = 250.0;
-    Kd(19) = 10.0;
+    Kd(19) = 2.5;
     Kp(20) = 250.0;
-    Kd(20) = 10.0;
+    Kd(20) = 2.0;
     Kp(21) = 50.0;
-    Kd(21) = 1.0; // Left Wrist
+    Kd(21) = 2.0; // Left Wrist
     Kp(22) = 50.0;
-    Kd(22) = 1.0; // Left Wrist
+    Kd(22) = 2.0; // Left Wrist
 
-    Kp(23) = 100.0;
-    Kd(23) = 2.0; // Neck
-    Kp(24) = 100.0;
-    Kd(24) = 2.0; // Neck
+    Kp(23) = 250.0;
+    Kd(23) = 2.5; // Neck
+    Kp(24) = 250.0;
+    Kd(24) = 2.5; // Neck
 
     Kp(25) = 400.0;
     Kd(25) = 10.0;
@@ -7369,13 +7369,13 @@ void AvatarController::Joint_gain_set_MJ()
     Kp(28) = 400.0;
     Kd(28) = 10.0;
     Kp(29) = 250.0;
-    Kd(29) = 10.0;
+    Kd(29) = 2.5;
     Kp(30) = 250.0;
-    Kd(30) = 10.0;
+    Kd(30) = 2.0;
     Kp(31) = 50.0;
-    Kd(31) = 1.0; // Right Wrist
+    Kd(31) = 2.0; // Right Wrist
     Kp(32) = 50.0;
-    Kd(32) = 1.0; // Right Wrist
+    Kd(32) = 2.0; // Right Wrist
 
     Kp_virtual_(0) = 100;
     Kd_virtual_(0) =  20;
@@ -7390,88 +7390,8 @@ void AvatarController::Joint_gain_set_MJ()
     Kp_virtual_(5) = 100;
     Kd_virtual_(5) =  20;
 
-    if(!param_sim_mode_)
-    {
-        Kp_virtual_.segment(6, MODEL_DOF) = Kp;
-        Kd_virtual_.segment(6, MODEL_DOF) = Kd;
-        cout << "simulation joint gain set" << endl;
-    }
-    else
-    {
-        Kp_virtual_( 0 + 6) = 1800.0;
-        Kd_virtual_( 0 + 6) = 70.0;
-        Kp_virtual_( 1 + 6) = 5000.0;
-        Kd_virtual_( 1 + 6) = 50.0;
-        Kp_virtual_( 2 + 6) = 5000.0;
-        Kd_virtual_( 2 + 6) = 50.0;
-        Kp_virtual_( 3 + 6) = 5000.0;
-        Kd_virtual_( 3 + 6) = 50.0;
-        Kp_virtual_( 4 + 6) = 5000.0;
-        Kd_virtual_( 4 + 6) = 50.0;
-        Kp_virtual_( 5 + 6) = 5000.0;
-        Kd_virtual_( 5 + 6) = 50.0;
-
-        Kp_virtual_( 6 + 6) = 1800.0;
-        Kd_virtual_( 6 + 6) = 70.0;
-        Kp_virtual_( 7 + 6) = 5000.0;
-        Kd_virtual_( 7 + 6) = 50.0;
-        Kp_virtual_( 8 + 6) = 5000.0;
-        Kd_virtual_( 8 + 6) = 50.0;
-        Kp_virtual_( 9 + 6) = 5000.0;
-        Kd_virtual_( 9 + 6) = 50.0;
-        Kp_virtual_(10 + 6) = 5000.0;
-        Kd_virtual_(10 + 6) = 50.0;
-        Kp_virtual_(11 + 6) = 5000.0;
-        Kd_virtual_(11 + 6) = 50.0;
-
-        Kp_virtual_(12 + 6) = 3600.0;
-        Kd_virtual_(12 + 6) = 100.0;
-        Kp_virtual_(13 + 6) = 3600.0;
-        Kd_virtual_(13 + 6) = 100.0;
-        Kp_virtual_(14 + 6) = 3600.0;
-        Kd_virtual_(14 + 6) = 100.0;
-
-        Kp_virtual_(15 + 6) = 400.0;
-        Kd_virtual_(15 + 6) = 10.0;
-        Kp_virtual_(16 + 6) = 800.0;
-        Kd_virtual_(16 + 6) = 10.0;
-        Kp_virtual_(17 + 6) = 400.0;
-        Kd_virtual_(17 + 6) = 10.0;
-        Kp_virtual_(18 + 6) = 400.0;
-        Kd_virtual_(18 + 6) = 10.0;
-        Kp_virtual_(19 + 6) = 250.0;
-        Kd_virtual_(19 + 6) = 10.0;
-        Kp_virtual_(20 + 6) = 250.0;
-        Kd_virtual_(20 + 6) = 10.0;
-        Kp_virtual_(21 + 6) = 800.0;
-        Kd_virtual_(21 + 6) = 10.0;
-        Kp_virtual_(22 + 6) = 20000.0;
-        Kd_virtual_(22 + 6) = 100.0;
-
-        Kp_virtual_(23 + 6) = 100.0;
-        Kd_virtual_(23 + 6) = 2.0;
-        Kp_virtual_(24 + 6) = 100.0;
-        Kd_virtual_(24 + 6) = 2.0;
-
-        Kp_virtual_(25 + 6) = 400.0;
-        Kd_virtual_(25 + 6) = 10.0;
-        Kp_virtual_(26 + 6) = 800.0;
-        Kd_virtual_(26 + 6) = 10.0;
-        Kp_virtual_(27 + 6) = 400.0;
-        Kd_virtual_(27 + 6) = 10.0;
-        Kp_virtual_(28 + 6) = 400.0;
-        Kd_virtual_(28 + 6) = 10.0;
-        Kp_virtual_(29 + 6) = 250.0;
-        Kd_virtual_(29 + 6) = 10.0;
-        Kp_virtual_(30 + 6) = 250.0;
-        Kd_virtual_(30 + 6) = 10.0;
-        Kp_virtual_(31 + 6) = 800.0;
-        Kd_virtual_(31 + 6) = 10.0;
-        Kp_virtual_(32 + 6) = 20000.0;
-        Kd_virtual_(32 + 6) = 100.0;
-
-        cout << "experiment joint gain set" << endl;
-    }
+    Kp_virtual_.segment(6, MODEL_DOF) = Kp;
+    Kd_virtual_.segment(6, MODEL_DOF) = Kd;
 }
 
 void AvatarController::addZmpOffset()
@@ -11819,76 +11739,131 @@ void AvatarController::updateNextStepTimeJoy()
 
 Eigen::VectorQd AvatarController::MitWholebodyInverseDynamicsController(const Eigen::VectorQd &torque_prev, const Eigen::VectorVQd &qddot_cmd, const Eigen::Vector12d &f_c_cmd)
 {
-    const int control_size_torque        = MODEL_DOF;
-    const int control_size_qddot         = MODEL_DOF_VIRTUAL;
+    const int control_size_torque = MODEL_DOF;
+    const int control_size_qddot = MODEL_DOF_VIRTUAL;
     const int control_size_contact_force = 12;
-    const int variable_size              = control_size_torque      + control_size_qddot       + control_size_contact_force;
+    const int control_size_contact_accel = 12;
+    const int variable_size   = control_size_torque + control_size_qddot + control_size_contact_force + control_size_contact_accel;
 
-    const int constraint_size_dynamics   = MODEL_DOF_VIRTUAL;
-    const int constraint_size_friction   = 34;
-    const int constraint_size            = constraint_size_dynamics + constraint_size_friction                             ;
+    const int constraint_size_dynamics = MODEL_DOF_VIRTUAL;
+    const int constraint_size_torque   = MODEL_DOF;
+    const int constraint_size_contact  = 12;
+    const int constraint_size_friction = 32;    // left + right
+    const int constraint_size = constraint_size_dynamics + constraint_size_torque + constraint_size_contact + constraint_size_friction; 
 
-    if(is_wbid_init_ == true)
+    if (is_wbid_init_ == true)
     {
         QP_wbid.InitializeProblemSize(variable_size, constraint_size);
-        
-        J_lfoot_.setZero();     J_lfoot_     = rd_.link_[Left_Foot].Jac();
 
-        J_rfoot_.setZero();     J_rfoot_     = rd_.link_[Right_Foot].Jac();
+        J_lfoot_.setZero();     J_lfoot_ = rd_.link_[Left_Foot].Jac();
+        J_lfoot_pre_.setZero(); J_lfoot_pre_ = rd_.link_[Left_Foot].Jac();
+        J_lfoot_dot_.setZero();
+        J_rfoot_.setZero();     J_rfoot_ = rd_.link_[Right_Foot].Jac();
+        J_rfoot_pre_.setZero(); J_rfoot_pre_ = rd_.link_[Right_Foot].Jac();
+        J_rfoot_dot_.setZero();
 
         is_wbid_init_ = false;
     }
 
+    J_lfoot_pre_ = J_lfoot_;
+    J_rfoot_pre_ = J_rfoot_;
+
     J_lfoot_ = rd_.link_[Left_Foot].Jac();
     J_rfoot_ = rd_.link_[Right_Foot].Jac();
 
-    Eigen::MatrixXd J_contact;     J_contact.setZero(control_size_contact_force, control_size_qddot);
+    J_lfoot_dot_ = (J_lfoot_ - J_lfoot_pre_) * hz_;
+    J_rfoot_dot_ = (J_rfoot_ - J_rfoot_pre_) * hz_;
 
+    Eigen::MatrixXd J_contact;     J_contact.setZero(control_size_contact_force, control_size_qddot);
+    Eigen::MatrixXd J_contact_dot; J_contact_dot.setZero(control_size_contact_force, control_size_qddot);
     J_contact.topRows(6)        = J_lfoot_;
     J_contact.bottomRows(6)     = J_rfoot_;
+    J_contact_dot.topRows(6)    = J_lfoot_dot_;
+    J_contact_dot.bottomRows(6) = J_rfoot_dot_;
 
-    double W_qa             = 2.0;
-    double W_torque         = 2.5;
-    double W_contact_wrench = 2.0;
-    double W_energy         = 0.2;
+    double W_qb_x     = 1000.0; 
+    double W_qb_y     = 1000.0; 
+    double W_qb_z     = 1000.0; 
+    double W_qb_roll  = 1000.0; 
+    double W_qb_pitch = 1000.0; 
+    double W_qb_yaw   = 1000.0; 
 
+    double W_qa       = 2000.0; 
+
+    double W_torque_1 = 100.0;
+    double W_torque_2 = 2500.0;
+    double W_c_lfoot  = 1.0;
+    double W_c_rfoot  = 1.0;
+    double W_f_lfoot  = 2000.0;
+    double W_f_rfoot  = 2000.0;
+    
+    double W_energy   = 100.0;
+
+    if(is_dsp_fast_)
+    {
+        W_c_lfoot = 1.0;
+        W_c_rfoot = 1.0; 
+    }
+    else if(is_ssp_fast_)
+    {
+        if(is_lfoot_support_fast_ == true)
+        {
+            W_c_lfoot = 1.0;
+            W_c_rfoot = 0.0;
+        }
+        else if(is_rfoot_support_fast_ == true)
+        {
+            W_c_lfoot = 0.0;
+            W_c_rfoot = 1.0; 
+        }
+    }
+
+
+    // COST FUNCTION
     Eigen::MatrixXd H_wbid; H_wbid.setZero(variable_size, variable_size);
     unsigned int H_idx = 0;
 
-    //q_ddot_, torque, contact_accel, contact_force
-    //q_ddot_
-    H_wbid.block(H_idx, H_idx, control_size_qddot, control_size_qddot) = W_qa*Eigen::MatrixXd::Identity(control_size_qddot, control_size_qddot) + W_energy*rd_.A_;
+    Eigen::MatrixXd W_q; W_q.setIdentity(control_size_qddot, control_size_qddot);
+    W_q(0, 0) = W_qb_x;
+    W_q(1, 1) = W_qb_y;
+    W_q(2, 2) = W_qb_z;
+    W_q(3, 3) = W_qb_roll;
+    W_q(4, 4) = W_qb_pitch;
+    W_q(5, 5) = W_qb_yaw;
+
+    for (int i = 6; i < control_size_qddot; ++i) {W_q(i, i) = W_qa;}
+    H_wbid.block(H_idx, H_idx, control_size_qddot, control_size_qddot) = W_q + W_energy*rd_.A_;
     H_idx += control_size_qddot;
-    //torque_
-    H_wbid.block(H_idx, H_idx, control_size_torque, control_size_torque) = W_torque*Eigen::MatrixXd::Identity(control_size_torque, control_size_torque);
+    H_wbid.block(H_idx, H_idx, control_size_torque, control_size_torque) = (W_torque_1 + W_torque_2) * Eigen::MatrixXd::Identity(control_size_torque, control_size_torque) + W_energy * rd_.q_dot_ * rd_.q_dot_.transpose();
     H_idx += control_size_torque;
-    //contact_force - lfoot, rfoot
-    H_wbid.block(H_idx, H_idx, control_size_contact_force, control_size_contact_force) = W_contact_wrench*Eigen::MatrixXd::Identity(control_size_contact_force, control_size_contact_force);
-    H_idx += control_size_contact_force;
+    H_wbid.block(H_idx, H_idx, control_size_contact_accel / 2, control_size_contact_accel / 2) = W_c_lfoot * Eigen::MatrixXd::Identity(control_size_contact_accel / 2, control_size_contact_accel/ 2);
+    H_idx += control_size_contact_accel / 2;
+    H_wbid.block(H_idx, H_idx, control_size_contact_accel / 2, control_size_contact_accel / 2) = W_c_rfoot * Eigen::MatrixXd::Identity(control_size_contact_accel / 2, control_size_contact_accel/ 2);
+    H_idx += control_size_contact_accel / 2;
+    H_wbid.block(H_idx, H_idx, control_size_contact_force / 2, control_size_contact_force / 2) = W_f_lfoot * Eigen::MatrixXd::Identity(control_size_contact_force / 2, control_size_contact_force / 2);
+    H_idx += control_size_contact_force / 2;
+    H_wbid.block(H_idx, H_idx, control_size_contact_force / 2, control_size_contact_force / 2) = W_f_rfoot * Eigen::MatrixXd::Identity(control_size_contact_force / 2, control_size_contact_force / 2);
+    H_idx += control_size_contact_force / 2;
 
-    Eigen::MatrixXd g_wbid; g_wbid.setZero(variable_size,1);
+    Eigen::VectorXd g_wbid; g_wbid.setZero(variable_size);
     unsigned int g_idx = 0;
-    //q_ddot_ - to track the qddot_cmd
-    g_wbid.block(g_idx, 0, control_size_qddot, 1)  = - W_qa * qddot_cmd;
+    g_wbid.segment(g_idx, control_size_qddot) = -W_q * qddot_cmd;
     g_idx += control_size_qddot;
-    //torque_ - to regularize with torque_prev
-    g_wbid.block(g_idx, 0, control_size_torque, 1) = - W_torque * torque_prev;
+    g_wbid.segment(g_idx, control_size_torque) = -W_torque_2 * torque_prev;
     g_idx += control_size_torque;
-    //contact_force - to track the f_c_cmd
-    g_wbid.block(g_idx, 0, control_size_contact_force, 1) = - W_contact_wrench * f_c_cmd;
+    g_idx += control_size_contact_accel;
+    g_wbid.segment(g_idx, control_size_contact_force / 2) = -W_f_lfoot * f_c_cmd.head(6);
+    g_idx += control_size_contact_force / 2;
+    g_wbid.segment(g_idx, control_size_contact_force / 2) = -W_f_rfoot * f_c_cmd.tail(6);
 
-    //constraints
-    //Selection matrix to exclude virtual joint
+    // CONSTRAINTS
     Eigen::MatrixXd S_T; S_T.setZero(control_size_qddot, control_size_torque);
     S_T.bottomRows(control_size_torque).setIdentity();
 
-    //Matrix for friction ref. S.Caron
-    Eigen::MatrixXd U_fric_dsp; U_fric_dsp.setZero(constraint_size_friction, control_size_contact_force);
-    Eigen::MatrixXd U_fric_ssp; U_fric_ssp.setZero(constraint_size_friction/2, control_size_contact_force/2);
-    double X = 0.15; double Y = 0.075; double mu = 0.7;
-
-    U_fric_ssp <<  0,  0,            -1,   0,   0,  0,
-                  -1,  0,           -mu,   0,   0,  0,
+    Eigen::MatrixXd U_fric;     U_fric.setZero(constraint_size_friction, control_size_contact_force);
+    Eigen::MatrixXd U_fric_sub; U_fric_sub.setZero(constraint_size_friction / 2, control_size_contact_force / 2);
+    double X = 0.15; double Y = 0.08; double mu = 0.7;
+    U_fric_sub << -1,  0,           -mu,   0,   0,  0,
                   +1,  0,           -mu,   0,   0,  0,
                    0, -1,           -mu,   0,   0,  0,
                    0, +1,           -mu,   0,   0,  0,
@@ -11904,40 +11879,46 @@ Eigen::VectorQd AvatarController::MitWholebodyInverseDynamicsController(const Ei
                   +Y, +X, -(X + Y) * mu, +mu, -mu, +1,
                   -Y, -X, -(X + Y) * mu, -mu, -mu, +1,
                   -Y, +X, -(X + Y) * mu, -mu, +mu, +1;
-    
-    U_fric_dsp.topLeftCorner(17, 6) = U_fric_ssp;
-    U_fric_dsp.bottomRightCorner(17, 6) = U_fric_ssp;
+    U_fric.block(                           0,                              0, constraint_size_friction / 2, control_size_contact_force / 2) = U_fric_sub; // Left foot
+    U_fric.block(constraint_size_friction / 2, control_size_contact_force / 2, constraint_size_friction / 2, control_size_contact_force / 2) = U_fric_sub; // Right foot
 
     Eigen::MatrixXd A_wbid;   A_wbid.setZero(constraint_size, variable_size);
-    Eigen::MatrixXd lbA_wbid; lbA_wbid.setZero(constraint_size, 1);
-    Eigen::MatrixXd ubA_wbid; ubA_wbid.setZero(constraint_size, 1);
+    Eigen::VectorXd lbA_wbid; lbA_wbid.setZero(constraint_size);
+    Eigen::VectorXd ubA_wbid; ubA_wbid.setZero(constraint_size);
 
     unsigned int A_idx = 0;
-    //Dynamics
-    //A * q_ddot_ + b(omitted) + g = S_T * torque + J_contact * contact_force;
-    //A * q_ddot_ - S_T * torque - J_contact * contact_force = - b(omitted) - g;
-    A_wbid.block(A_idx, 0                                       , constraint_size_dynamics, control_size_qddot) = rd_.A_;
-    A_wbid.block(A_idx, control_size_qddot                      , constraint_size_dynamics, control_size_torque) = - S_T;
-    A_wbid.block(A_idx, control_size_qddot + control_size_torque, constraint_size_dynamics, control_size_contact_force) = - J_contact.transpose();
-    A_idx += constraint_size_dynamics;
-    //friction constraint
-    A_wbid.block(A_idx, control_size_qddot + control_size_torque, constraint_size_friction, control_size_contact_force) = U_fric_dsp;
+    A_wbid.block(A_idx, 0,                                                                     constraint_size_dynamics, control_size_qddot)         = rd_.A_;
+    A_wbid.block(A_idx, control_size_qddot,                                                    constraint_size_dynamics, control_size_torque)        =-S_T;
+    A_wbid.block(A_idx, control_size_qddot + control_size_torque,                              constraint_size_dynamics, control_size_contact_accel).setZero();
+    A_wbid.block(A_idx, control_size_qddot + control_size_torque + control_size_contact_accel, constraint_size_dynamics, control_size_contact_force) =-J_contact.transpose();
 
-    //lower bound
-    //equality for dynamics
-    A_idx = 0;
-    lbA_wbid.block(A_idx, 0, constraint_size_dynamics, 1) = -rd_.G;
     A_idx += constraint_size_dynamics;
-    //friction constraint
-    lbA_wbid.block(A_idx, 0, constraint_size_friction, 1).setConstant(-std::numeric_limits<double>::infinity());
+    A_wbid.block(A_idx, control_size_qddot,                                                    constraint_size_torque,   control_size_torque).setIdentity();
 
-    //upper bound
-    //equality for dynamics
+    A_idx += constraint_size_torque;
+    A_wbid.block(A_idx, 0,                                                                     constraint_size_contact,  control_size_qddot) = J_contact;
+    A_wbid.block(A_idx, control_size_qddot + control_size_torque,                              constraint_size_contact,  control_size_contact_accel) = -Eigen::MatrixXd::Identity(control_size_contact_accel, control_size_contact_accel);
+
+    A_idx += constraint_size_contact;
+    A_wbid.block(A_idx, control_size_qddot + control_size_torque + control_size_contact_accel, constraint_size_friction, control_size_contact_force) = U_fric;
+
     A_idx = 0;
-    ubA_wbid.block(A_idx, 0, constraint_size_dynamics, 1) = -rd_.G;
+    lbA_wbid.segment(A_idx, constraint_size_dynamics) = -rd_.G;
     A_idx += constraint_size_dynamics;
-    //friction constraint
-    ubA_wbid.block(A_idx, 0, constraint_size_friction, 1).setZero();
+    lbA_wbid.segment(A_idx, constraint_size_torque) =-rd_.torque_limit;
+    A_idx += constraint_size_torque;
+    lbA_wbid.segment(A_idx, constraint_size_contact) = -J_contact_dot * rd_.q_dot_virtual_;
+    A_idx += constraint_size_contact;
+    lbA_wbid.segment(A_idx, constraint_size_friction).setConstant(-std::numeric_limits<double>::infinity());
+
+    A_idx = 0;
+    ubA_wbid.segment(A_idx, constraint_size_dynamics) = -rd_.G;
+    A_idx += constraint_size_dynamics;
+    ubA_wbid.segment(A_idx, constraint_size_torque) = rd_.torque_limit;
+    A_idx += constraint_size_torque;
+    ubA_wbid.segment(A_idx, constraint_size_contact) = -J_contact_dot * rd_.q_dot_virtual_;
+    A_idx += constraint_size_contact;
+    ubA_wbid.segment(A_idx, constraint_size_friction).setZero();
 
     QP_wbid.EnableEqualityCondition(equality_condition_eps_);
     QP_wbid.UpdateMinProblem(H_wbid, g_wbid);
@@ -11952,6 +11933,7 @@ Eigen::VectorQd AvatarController::MitWholebodyInverseDynamicsController(const Ei
     else
     {
         torque_opt_.setZero();
+
         std::cout << "WBD CONTROLLER CANNOT BE SOLVED!" << std::endl;
     }
 
