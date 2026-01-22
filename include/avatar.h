@@ -1110,6 +1110,7 @@ public:
 
     void CP_compen_MJ();
     void CP_compen_MJ_FT();
+    void contactWrenchCalculator();
     double damping_x = 0;
     double damping_y = 0;
     Eigen::Vector2d Tau_R;
@@ -1673,6 +1674,7 @@ public:
     void getVirtualJointState(const Eigen::Isometry3d& transform_global_to_float, const Eigen::Isometry3d& transform_float_to_support);
     
     Eigen::VectorQd MitWholebodyInverseDynamicsController(const Eigen::VectorQd &torque_prev, const Eigen::VectorVQd &qddot_cmd, const Eigen::Vector12d &f_c_cmd);
+    Eigen::VectorQd WholebodyInverseDynamics_EC2(const Eigen::VectorQd &torque_prev, const Eigen::VectorVQd &qddot_cmd, const Eigen::Vector12d &f_c_cmd);
 
     Eigen::VectorVQd q_virtual_;
     Eigen::VectorVQd qdot_virtual_;

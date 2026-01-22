@@ -640,13 +640,6 @@ void AvatarController::computeSlow()
 
                 ref_q_.segment(0, 12) = q_des_;
 
-                if (atb_grav_update_ == false)
-                {
-                    atb_grav_update_ = true;
-                    Gravity_MJ_fast_ = Gravity_MJ_;
-                    atb_grav_update_ = false;
-                }
-
                 if (walking_tick_ < 1.0 * hz_)
                 {
                     for (int i = 0; i < 12; i++) //for leg
@@ -656,12 +649,7 @@ void AvatarController::computeSlow()
                 }
 
                 CP_compen_MJ_FT();
-                
-                torque_lower_.setZero();
-                for (int i = 0; i < 12; i++)
-                {
-                    torque_lower_(i) = Kp(i) * (ref_q_(i) - rd_.q_(i)) - Kd(i) * rd_.q_dot_(i) + 1.0 * Gravity_MJ_fast_(i);
-                }
+                contactWrenchCalculator();
 
                 desired_q_not_compensated_ = ref_q_;
                 updateNextStepTime();
@@ -701,19 +689,6 @@ void AvatarController::computeSlow()
                 cout << "walking finish" << endl;
                 walking_end_flag = 1;
                 initial_flag = 0;
-            }
-
-            if (atb_grav_update_ == false)
-            {
-                atb_grav_update_ = true;
-                Gravity_MJ_fast_ = Gravity_MJ_;
-                atb_grav_update_ = false;
-            }
-
-            torque_lower_.setZero();
-            for (int i = 0; i < 12; i++)
-            {
-                torque_lower_(i) = Kp(i) * (ref_q_(i) - rd_.q_(i)) - Kd(i) * rd_.q_dot_(i) + Gravity_MJ_fast_(i);
             }
         }
         /////////////////////////////////////////////////////////////////////////////////////////
@@ -757,13 +732,6 @@ void AvatarController::computeSlow()
 
             atb_walking_traj_update_ = false;
         }
-
-        if(atb_grav_update_ == false)
-        {
-            atb_grav_update_ = true;
-            Gravity_MJ_fast_ = Gravity_MJ_;
-            atb_grav_update_ = false;
-        }
         
         if (atb_desired_q_update_ == false)
         {
@@ -773,17 +741,6 @@ void AvatarController::computeSlow()
             atb_desired_q_update_ = false;
         }
 
-        torque_upper_.setZero();
-        for (int i = 12; i < MODEL_DOF; i++)
-        {
-            torque_upper_(i) = (kp_joint_(i) * (desired_q_fast_(i) - rd_.q_(i)) + kv_joint_(i) * (desired_q_dot_fast_(i) - rd_.q_dot_(i)) + Gravity_MJ_fast_(i));
-        }
-
-        ///////////////////////////////FINAL TORQUE COMMAND/////////////////////////////
-        rd_.torque_desired = torque_lower_ + torque_upper_;
-        ////////////////////////////////////////////////////////////////////////////////
-        
-
         if(atb_desired_torque_update_ == false)
         {
             atb_desired_torque_update_ = true;
@@ -792,12 +749,12 @@ void AvatarController::computeSlow()
         }
 
         //WBD
-        //Eigen::VectorQd torque_sum = torque_wbd_ + (Kp_virtual_.asDiagonal()*q_error_virtual_ - Kd_virtual_.asDiagonal()*rd_.q_dot_virtual_).segment(6, MODEL_DOF);
-        Eigen::VectorQd torque_sum = torque_wbd_ + Kp.asDiagonal()*q_error_virtual_.segment(6, MODEL_DOF) - Kd.asDiagonal()*rd_.q_dot_virtual_.segment(6, MODEL_DOF);
-        for(int i = 0; i < MODEL_DOF; i ++)
-        {
-            torque_sum(i) = DyrosMath::minmax_cut(torque_sum(i), -rd_.torque_limit(i), rd_.torque_limit(i));
-        }
+        //Eigen::VectorQd torque_sum = torque_wbd_ + Kp.asDiagonal()*q_error_virtual_.segment(6, MODEL_DOF) - Kd.asDiagonal()*rd_.q_dot_virtual_.segment(6, MODEL_DOF);
+        q_error_virtual_.segment(6, 12).setZero();
+        //q_error_virtual_.segment(6, MODEL_DOF).setZero();
+        Eigen::VectorQd torque_pd  = Kp.asDiagonal() * q_error_virtual_.segment(6, MODEL_DOF)
+                                   - Kd.asDiagonal() * rd_.q_dot_;
+        Eigen::VectorQd torque_sum = torque_wbd_ + torque_pd;//+ Kd.asDiagonal() * (Eigen::VectorQd::Zero() - rd_.q_dot_);
 
         ///////////////////////////////FINAL TORQUE COMMAND/////////////////////////////
         torque_desired_prev_ = torque_sum;
@@ -1074,40 +1031,6 @@ void AvatarController::computeFast()
     }
     else if (rd_.tc_.mode == 11)
     {
-        ////////////////////////////////////////////////////////////////////////////
-        /////////////////// Biped Walking Controller made by MJ ////////////////////
-        ////////////////////////////////////////////////////////////////////////////
-        if (walking_enable_ == true)
-        {
-            if (current_step_num_ < total_step_num_)
-            {
-                GravityCalculate_MJ();
-            }
-        }
-        else
-        {
-            WBC::SetContact(rd_, 1, 1);
-            int support_foot;
-            if (foot_step_(current_step_num_, 6) == 1)
-            {
-                support_foot = 1;
-            }
-            else
-            {
-                support_foot = 0;
-            }
-             
-            if (atb_grav_update_ == false)
-            {
-                VectorQd Gravity_MJ_local = WBC::ContactForceRedistributionTorqueWalking(rd_, WBC::GravityCompensationTorque(rd_), 0.9, 1, support_foot);
-
-                atb_grav_update_ = true;
-                Gravity_MJ_ = Gravity_MJ_local;
-                atb_grav_update_ = false;
-            }
-        }
-        /////////////////////////////////////////////////////////////////////////////////////////
-
         if(atb_walking_traj_update_ == false)
         {
             atb_walking_traj_update_ = true;
@@ -7382,27 +7305,27 @@ void AvatarController::floatToSupportFootstep()
 
 void AvatarController::Joint_gain_set_MJ()
 {
-    Kp(0) = 1800.0;
-    Kd(0) = 70.0; // Left Hip yaw
-    Kp(1) = 2100.0;
-    Kd(1) = 90.0; // Left Hip roll
-    Kp(2) = 2100.0;
-    Kd(2) = 90.0; // Left Hip pitch
-    Kp(3) = 2100.0;
-    Kd(3) = 90.0; // Left Knee pitch
-    Kp(4) = 2100.0;
-    Kd(4) = 90.0; // Left Ankle pitch
-    Kp(5) = 4000.0;
-    Kd(5) = 65.0; // Left Ankle roll
+    Kp( 0) = 1800.0;
+    Kd( 0) = 70.0; // Left Hip yaw
+    Kp( 1) = 2100.0;
+    Kd( 1) = 90.0; // Left Hip roll
+    Kp( 2) = 2100.0;
+    Kd( 2) = 90.0; // Left Hip pitch
+    Kp( 3) = 2100.0;
+    Kd( 3) = 90.0; // Left Knee pitch
+    Kp( 4) = 2100.0;
+    Kd( 4) = 90.0; // Left Ankle pitch
+    Kp( 5) = 4000.0;
+    Kd( 5) = 65.0; // Left Ankle roll
 
-    Kp(6) = 1800.0;
-    Kd(6) = 70.0; // Right Hip yaw
-    Kp(7) = 2100.0;
-    Kd(7) = 90.0; // Right Hip roll
-    Kp(8) = 2100.0;
-    Kd(8) = 90.0; // Right Hip pitch
-    Kp(9) = 2100.0;
-    Kd(9) = 90.0; // Right Knee pitch
+    Kp( 6) = 1800.0;
+    Kd( 6) = 70.0; // Right Hip yaw
+    Kp( 7) = 2100.0;
+    Kd( 7) = 90.0; // Right Hip roll
+    Kp( 8) = 2100.0;
+    Kd( 8) = 90.0; // Right Hip pitch
+    Kp( 9) = 2100.0;
+    Kd( 9) = 90.0; // Right Knee pitch
     Kp(10) = 2100.0;
     Kd(10) = 90.0; // Right Ankle pitch
     Kp(11) = 4000.0;
@@ -7467,7 +7390,7 @@ void AvatarController::Joint_gain_set_MJ()
     Kp_virtual_(5) = 100;
     Kd_virtual_(5) =  20;
 
-    if(param_sim_mode_)
+    if(!param_sim_mode_)
     {
         Kp_virtual_.segment(6, MODEL_DOF) = Kp;
         Kd_virtual_.segment(6, MODEL_DOF) = Kd;
@@ -7582,8 +7505,8 @@ void AvatarController::addZmpOffset()
     {
         if(mpc_on_bool_)
         {
-            lfoot_zmp_offset_ = -(0.030 - 0.010*(1 - (bool)i));
-            rfoot_zmp_offset_ =  (0.030 - 0.010*(1 - (bool)i));
+            lfoot_zmp_offset_ = -(0.045 - 0.015*(1 - (bool)i));
+            rfoot_zmp_offset_ =  (0.045 - 0.015*(1 - (bool)i));
         }
 
         if (foot_step_(i, 6) == 0) // left support foot 
@@ -11238,7 +11161,7 @@ void AvatarController::GravityCalculate_MJ()
 
 void AvatarController::parameterSetting()
 {       
-    target_x_ = 0.0;
+    target_x_ = 10.0;
     target_y_ = 0.0;
     target_z_ = 0.0;
     com_height_ = 0.71;
@@ -11247,19 +11170,19 @@ void AvatarController::parameterSetting()
     step_length_y_ = 0.0;
     is_right_foot_swing_ = 1;
     
-    t_dsp1_        = 0.10 * hz_;
-    t_dsp2_        = 0.10 * hz_;
-    t_total_       = 0.8 * hz_;
-    t_dsp1_const_  = 0.10 * hz_;
-    t_dsp2_const_  = 0.10 * hz_;
-    t_total_const_ = 0.8 * hz_;
+    //t_dsp1_        = 0.10 * hz_;
+    //t_dsp2_        = 0.10 * hz_;
+    //t_total_       = 0.8 * hz_;
+    //t_dsp1_const_  = 0.10 * hz_;
+    //t_dsp2_const_  = 0.10 * hz_;
+    //t_total_const_ = 0.8 * hz_;
 
-    //t_dsp1_        = 0.25 * hz_;
-    //t_dsp2_        = 0.25 * hz_;
-    //t_total_       = 1.5 * hz_;
-    //t_dsp1_const_  = 0.25 * hz_;
-    //t_dsp2_const_  = 0.25 * hz_;
-    //t_total_const_ = 1.5 * hz_;
+    t_dsp1_        = 0.25 * hz_;
+    t_dsp2_        = 0.25 * hz_;
+    t_total_       = 1.5 * hz_;
+    t_dsp1_const_  = 0.25 * hz_;
+    t_dsp2_const_  = 0.25 * hz_;
+    t_total_const_ = 1.5 * hz_;
 
     t_ssp_ = t_total_ - t_dsp1_ - t_dsp2_;
     //foot_width_  = zmp_y_max;
@@ -11499,6 +11422,52 @@ void AvatarController::CP_compen_MJ_FT()
     //F_T_R_x_input = 0.0;
     //F_T_L_y_input = 0.0;
     //F_T_R_y_input = 0.0;
+}
+
+void AvatarController::contactWrenchCalculator()
+{
+    double ZMP_X_DES_CALC = 0.0;
+    double ZMP_Y_DES_CALC = 0.0;
+    double lambda_desired = 0.0;
+
+    vrp_desired_ << MPC_Stabilizer_state_main_(2), MPC_Stabilizer_state_main_(5), MPC_Stabilizer_state_main_(8);
+
+    double X_foot_Center = ref_zmp_wo_offset_(walking_tick_ - ((bool)current_step_num_)*t_start_, 0);
+    double Y_foot_Center = ref_zmp_wo_offset_(walking_tick_ - ((bool)current_step_num_)*t_start_, 1);
+
+    lambda_desired = (MPC_Stabilizer_state_main_(6) - MPC_Stabilizer_state_main_(8) + GRAVITY*b_*b_)/(MPC_Stabilizer_state_main_(6)*b_*b_);
+    ZMP_X_DES_CALC = (MPC_Stabilizer_state_main_(2) - (1 - lambda_desired*b_*b_)*MPC_Stabilizer_state_main_(0))/(lambda_desired*b_*b_);
+    ZMP_Y_DES_CALC = (MPC_Stabilizer_state_main_(5) - (1 - lambda_desired*b_*b_)*MPC_Stabilizer_state_main_(3))/(lambda_desired*b_*b_);
+
+    ZMP_X_DES_CALC = DyrosMath::minmax_cut(ZMP_X_DES_CALC, X_foot_Center - zmp_x_min_foot_width_, X_foot_Center + zmp_x_max_foot_width_);
+    ZMP_Y_DES_CALC = DyrosMath::minmax_cut(ZMP_Y_DES_CALC, Y_foot_Center - zmp_y_min_foot_width_, Y_foot_Center + zmp_y_max_foot_width_);
+
+    double alpha = 0.0;
+    double F_R = 0.0, F_L = 0.0;
+    double Tau_all_y = 0.0, Tau_R_y = 0.0, Tau_L_y = 0.0;
+    double Tau_all_x = 0.0, Tau_R_x = 0.0, Tau_L_x = 0.0;
+
+    double calc_z_max = 0.075;
+    alpha = (ZMP_Y_DES_CALC - (rfoot_support_current_.translation()(1) + calc_z_max)) / ((lfoot_support_current_.translation()(1) - calc_z_max) - (rfoot_support_current_.translation()(1) + calc_z_max));
+    alpha = DyrosMath::minmax_cut(alpha, 0.0, 1.0);
+
+    F_R = -(1 - alpha) * (rd_.link_[COM_id].mass) * lambda_desired * MPC_Stabilizer_state_main_(6);
+    F_L =     - alpha  * (rd_.link_[COM_id].mass) * lambda_desired * MPC_Stabilizer_state_main_(6);
+
+    //////////// TORQUE ////////////
+    Tau_all_x = -((rfoot_support_current_.translation()(1) - ZMP_Y_DES_CALC) * F_R + (lfoot_support_current_.translation()(1) - ZMP_Y_DES_CALC) * F_L);
+    Tau_all_y = -((rfoot_support_current_.translation()(0) - ZMP_X_DES_CALC) * F_R + (lfoot_support_current_.translation()(0) - ZMP_X_DES_CALC) * F_L);
+
+    Tau_R_x =(1 - alpha) * Tau_all_x;
+    Tau_R_y =(1 - alpha) * Tau_all_y;
+    Tau_L_x =     alpha  * Tau_all_x;
+    Tau_L_y =     alpha  * Tau_all_y;
+
+    lfoot_contact_wrench_ << 0.0, 0.0, F_L, Tau_L_x, Tau_L_y, 0.0;
+    rfoot_contact_wrench_ << 0.0, 0.0, F_R, Tau_R_x, Tau_R_y, 0.0;
+
+    lfoot_contact_wrench_ *= (-1.0);
+    rfoot_contact_wrench_ *= (-1.0);
 }
 
 void AvatarController::updateInitialStateJoy()
@@ -11850,131 +11819,63 @@ void AvatarController::updateNextStepTimeJoy()
 
 Eigen::VectorQd AvatarController::MitWholebodyInverseDynamicsController(const Eigen::VectorQd &torque_prev, const Eigen::VectorVQd &qddot_cmd, const Eigen::Vector12d &f_c_cmd)
 {
-    const int control_size_torque = MODEL_DOF;
-    const int control_size_qddot  = MODEL_DOF_VIRTUAL;
+    const int control_size_torque        = MODEL_DOF;
+    const int control_size_qddot         = MODEL_DOF_VIRTUAL;
     const int control_size_contact_force = 12;
-    const int control_size_contact_accel = 12;
-    const int variable_size = control_size_torque + control_size_qddot + control_size_contact_force + control_size_contact_accel;
+    const int variable_size              = control_size_torque      + control_size_qddot       + control_size_contact_force;
 
-    const int constraint_size_dynamics = MODEL_DOF_VIRTUAL;
-    const int constraint_size_torque   = MODEL_DOF;
-    const int constraint_size_contact  = 12;
-    const int constraint_size_friction = 32;
-    const int constraint_size = constraint_size_dynamics + constraint_size_torque + constraint_size_contact + constraint_size_friction;
+    const int constraint_size_dynamics   = MODEL_DOF_VIRTUAL;
+    const int constraint_size_friction   = 34;
+    const int constraint_size            = constraint_size_dynamics + constraint_size_friction                             ;
 
     if(is_wbid_init_ == true)
     {
         QP_wbid.InitializeProblemSize(variable_size, constraint_size);
         
         J_lfoot_.setZero();     J_lfoot_     = rd_.link_[Left_Foot].Jac();
-        J_lfoot_pre_.setZero(); J_lfoot_pre_ = rd_.link_[Left_Foot].Jac();
-        J_lfoot_dot_.setZero();
 
         J_rfoot_.setZero();     J_rfoot_     = rd_.link_[Right_Foot].Jac();
-        J_rfoot_pre_.setZero(); J_rfoot_pre_ = rd_.link_[Right_Foot].Jac();
-        J_rfoot_dot_.setZero();
 
         is_wbid_init_ = false;
     }
 
-    J_lfoot_pre_ = J_lfoot_;
-    J_rfoot_pre_ = J_rfoot_;
-
     J_lfoot_ = rd_.link_[Left_Foot].Jac();
     J_rfoot_ = rd_.link_[Right_Foot].Jac();
 
-    J_lfoot_dot_ = (J_lfoot_ - J_lfoot_pre_) * hz_;
-    J_rfoot_dot_ = (J_rfoot_ - J_rfoot_pre_) * hz_;
-
     Eigen::MatrixXd J_contact;     J_contact.setZero(control_size_contact_force, control_size_qddot);
-    Eigen::MatrixXd J_contact_dot; J_contact_dot.setZero(control_size_contact_force, control_size_qddot);
 
     J_contact.topRows(6)        = J_lfoot_;
     J_contact.bottomRows(6)     = J_rfoot_;
-    J_contact_dot.topRows(6)    = J_lfoot_dot_;
-    J_contact_dot.bottomRows(6) = J_rfoot_dot_;
 
-    double W_qb_x     = 2000.0;
-    double W_qb_y     = 2000.0;
-    double W_qb_z     = 2000.0;
-    double W_qb_roll  = 2000.0;
-    double W_qb_pitch = 2000.0;
-    double W_qb_yaw   = 2000.0;
-
-    double W_qa       = 2000.0;
-
-    double W_torque_1 = 000.0;
-    double W_torque_2 = 2500.0;
-    //double W_c_lfoot  = 1.0;
-    //double W_c_rfoot  = 1.0;
-    double W_c_lfoot  = 0.0;
-    double W_c_rfoot  = 0.0;
-    double W_f_lfoot  = 2000.0;
-    double W_f_rfoot  = 2000.0;
-
-    //if(is_dsp_fast_)    
-    //{
-    //    W_c_lfoot = 1.0;
-    //    W_c_rfoot = 1.0;
-    //}
-    //else if(is_ssp_fast_)
-    //{
-    //    if(is_lfoot_support_fast_ == true)
-    //    {
-    //        W_c_lfoot = 1.0;
-    //        W_c_rfoot = 0.0;
-    //    }
-    //    else if(is_rfoot_support_fast_ == true)
-    //    {
-    //        W_c_lfoot = 0.0;
-    //        W_c_rfoot = 1.0;
-    //    }
-    //}
+    double W_qa             = 2.0;
+    double W_torque         = 2.5;
+    double W_contact_wrench = 2.0;
+    double W_energy         = 0.2;
 
     Eigen::MatrixXd H_wbid; H_wbid.setZero(variable_size, variable_size);
     unsigned int H_idx = 0;
 
-    Eigen::MatrixXd W_q; W_q.setIdentity(control_size_qddot, control_size_qddot);
-    W_q(0,0) = W_qb_x;
-    W_q(1,1) = W_qb_y;
-    W_q(2,2) = W_qb_z;
-    W_q(3,3) = W_qb_roll;
-    W_q(4,4) = W_qb_pitch;
-    W_q(5,5) = W_qb_yaw;
-
     //q_ddot_, torque, contact_accel, contact_force
     //q_ddot_
-    for(int i = 6; i < control_size_qddot; ++i) {W_q(i,i) = W_qa;}
-    H_wbid.block(H_idx, H_idx, control_size_qddot, control_size_qddot) = W_q + 0.2*rd_.A_;
+    H_wbid.block(H_idx, H_idx, control_size_qddot, control_size_qddot) = W_qa*Eigen::MatrixXd::Identity(control_size_qddot, control_size_qddot) + W_energy*rd_.A_;
     H_idx += control_size_qddot;
     //torque_
-    H_wbid.block(H_idx, H_idx, control_size_torque, control_size_torque) = (W_torque_1 + W_torque_2)*Eigen::MatrixXd::Identity(control_size_torque, control_size_torque);
+    H_wbid.block(H_idx, H_idx, control_size_torque, control_size_torque) = W_torque*Eigen::MatrixXd::Identity(control_size_torque, control_size_torque);
     H_idx += control_size_torque;
-    //contact_accel - lfoot, rfoot
-    H_wbid.block(H_idx, H_idx, control_size_contact_accel / 2, control_size_contact_accel / 2) = W_c_lfoot * Eigen::MatrixXd::Identity(control_size_contact_accel / 2, control_size_contact_accel/ 2);
-    H_idx += control_size_contact_accel / 2;
-    H_wbid.block(H_idx, H_idx, control_size_contact_accel / 2, control_size_contact_accel / 2) = W_c_rfoot * Eigen::MatrixXd::Identity(control_size_contact_accel / 2, control_size_contact_accel/ 2);
-    H_idx += control_size_contact_accel / 2;
     //contact_force - lfoot, rfoot
-    H_wbid.block(H_idx, H_idx, control_size_contact_force / 2, control_size_contact_force / 2) = W_f_lfoot * Eigen::MatrixXd::Identity(control_size_contact_force / 2, control_size_contact_force / 2);
-    H_idx += control_size_contact_force / 2;
-    H_wbid.block(H_idx, H_idx, control_size_contact_force / 2, control_size_contact_force / 2) = W_f_rfoot * Eigen::MatrixXd::Identity(control_size_contact_force / 2, control_size_contact_force / 2);
-    H_idx += control_size_contact_force / 2;    
+    H_wbid.block(H_idx, H_idx, control_size_contact_force, control_size_contact_force) = W_contact_wrench*Eigen::MatrixXd::Identity(control_size_contact_force, control_size_contact_force);
+    H_idx += control_size_contact_force;
 
     Eigen::MatrixXd g_wbid; g_wbid.setZero(variable_size,1);
     unsigned int g_idx = 0;
     //q_ddot_ - to track the qddot_cmd
-    g_wbid.block(g_idx, 0, control_size_qddot, 1) = - W_q * qddot_cmd;
+    g_wbid.block(g_idx, 0, control_size_qddot, 1)  = - W_qa * qddot_cmd;
     g_idx += control_size_qddot;
     //torque_ - to regularize with torque_prev
-    g_wbid.block(g_idx, 0, control_size_torque, 1) = - W_torque_2 * torque_prev;
+    g_wbid.block(g_idx, 0, control_size_torque, 1) = - W_torque * torque_prev;
     g_idx += control_size_torque;
-    //contact_accel - to regularize to zero
-    g_idx += control_size_contact_accel;
     //contact_force - to track the f_c_cmd
-    g_wbid.block(g_idx, 0, control_size_contact_force/2, 1) = - W_f_lfoot * f_c_cmd.segment(0,6);
-    g_idx += control_size_contact_force/2;
-    g_wbid.block(g_idx, 0, control_size_contact_force/2, 1) = - W_f_rfoot * f_c_cmd.segment(6,6);
+    g_wbid.block(g_idx, 0, control_size_contact_force, 1) = - W_contact_wrench * f_c_cmd;
 
     //constraints
     //Selection matrix to exclude virtual joint
@@ -11982,11 +11883,12 @@ Eigen::VectorQd AvatarController::MitWholebodyInverseDynamicsController(const Ei
     S_T.bottomRows(control_size_torque).setIdentity();
 
     //Matrix for friction ref. S.Caron
-    Eigen::MatrixXd U_fric;     U_fric.setZero(constraint_size_friction, control_size_contact_force);
-    Eigen::MatrixXd U_fric_sub; U_fric_sub.setZero(constraint_size_friction/2, control_size_contact_force/2);
+    Eigen::MatrixXd U_fric_dsp; U_fric_dsp.setZero(constraint_size_friction, control_size_contact_force);
+    Eigen::MatrixXd U_fric_ssp; U_fric_ssp.setZero(constraint_size_friction/2, control_size_contact_force/2);
     double X = 0.15; double Y = 0.075; double mu = 0.7;
 
-    U_fric_sub << -1,  0,           -mu,   0,   0,  0,
+    U_fric_ssp <<  0,  0,            -1,   0,   0,  0,
+                  -1,  0,           -mu,   0,   0,  0,
                   +1,  0,           -mu,   0,   0,  0,
                    0, -1,           -mu,   0,   0,  0,
                    0, +1,           -mu,   0,   0,  0,
@@ -11994,17 +11896,17 @@ Eigen::VectorQd AvatarController::MitWholebodyInverseDynamicsController(const Ei
                    0,  0,            -Y,  +1,   0,  0,
                    0,  0,            -X,   0,  -1,  0,
                    0,  0,            -X,   0,  +1,  0,
-                  -Y, -X, -(X + Y) * mu, -mu, +mu, -1, 
-                  +Y, +X, -(X + Y) * mu, +mu, -mu, -1, 
-                  +Y, -X, -(X + Y) * mu, +mu, +mu, -1, 
-                  +Y, +X, -(X + Y) * mu, +mu, +mu, -1, 
-                  +Y, -X, -(X + Y) * mu, +mu, +mu, +1, 
-                  +Y, +X, -(X + Y) * mu, +mu, -mu, +1, 
-                  -Y, -X, -(X + Y) * mu, -mu, -mu, +1, 
+                  -Y, -X, -(X + Y) * mu, -mu, +mu, -1,
+                  +Y, +X, -(X + Y) * mu, +mu, -mu, -1,
+                  +Y, -X, -(X + Y) * mu, +mu, +mu, -1,
+                  +Y, +X, -(X + Y) * mu, +mu, +mu, -1,
+                  +Y, -X, -(X + Y) * mu, +mu, +mu, +1,
+                  +Y, +X, -(X + Y) * mu, +mu, -mu, +1,
+                  -Y, -X, -(X + Y) * mu, -mu, -mu, +1,
                   -Y, +X, -(X + Y) * mu, -mu, +mu, +1;
     
-    U_fric.block(                         0,                            0, constraint_size_friction/2, control_size_contact_force/2) = U_fric_sub; //left  foot
-    U_fric.block(constraint_size_friction/2, control_size_contact_force/2, constraint_size_friction/2, control_size_contact_force/2) = U_fric_sub; //right foot
+    U_fric_dsp.topLeftCorner(17, 6) = U_fric_ssp;
+    U_fric_dsp.bottomRightCorner(17, 6) = U_fric_ssp;
 
     Eigen::MatrixXd A_wbid;   A_wbid.setZero(constraint_size, variable_size);
     Eigen::MatrixXd lbA_wbid; lbA_wbid.setZero(constraint_size, 1);
@@ -12014,32 +11916,18 @@ Eigen::VectorQd AvatarController::MitWholebodyInverseDynamicsController(const Ei
     //Dynamics
     //A * q_ddot_ + b(omitted) + g = S_T * torque + J_contact * contact_force;
     //A * q_ddot_ - S_T * torque - J_contact * contact_force = - b(omitted) - g;
-    A_wbid.block(A_idx, 0                                                                    , constraint_size_dynamics, control_size_qddot) = rd_.A_;
-    A_wbid.block(A_idx, control_size_qddot                                                   , constraint_size_dynamics, control_size_torque) = - S_T;
-    A_wbid.block(A_idx, control_size_qddot + control_size_torque                             , constraint_size_dynamics, control_size_contact_accel).setZero();
-    A_wbid.block(A_idx, control_size_qddot + control_size_torque + control_size_contact_accel, constraint_size_dynamics, control_size_contact_force) = - J_contact.transpose();
+    A_wbid.block(A_idx, 0                                       , constraint_size_dynamics, control_size_qddot) = rd_.A_;
+    A_wbid.block(A_idx, control_size_qddot                      , constraint_size_dynamics, control_size_torque) = - S_T;
+    A_wbid.block(A_idx, control_size_qddot + control_size_torque, constraint_size_dynamics, control_size_contact_force) = - J_contact.transpose();
     A_idx += constraint_size_dynamics;
-    //torque min max
-    A_wbid.block(A_idx, control_size_qddot,                                                    constraint_size_torque,   control_size_torque).setIdentity();
-    A_idx += constraint_size_torque;
-    //contact constraint
-    A_wbid.block(A_idx, 0,                                                                     constraint_size_contact,  control_size_qddot) = J_contact;
-    A_wbid.block(A_idx, control_size_qddot + control_size_torque,                              constraint_size_contact,  control_size_contact_accel) = -Eigen::MatrixXd::Identity(control_size_contact_accel, control_size_contact_accel);
-    A_idx += constraint_size_contact;
     //friction constraint
-    A_wbid.block(A_idx, control_size_qddot + control_size_torque + control_size_contact_accel, constraint_size_friction, control_size_contact_force) = U_fric;
+    A_wbid.block(A_idx, control_size_qddot + control_size_torque, constraint_size_friction, control_size_contact_force) = U_fric_dsp;
 
     //lower bound
     //equality for dynamics
     A_idx = 0;
     lbA_wbid.block(A_idx, 0, constraint_size_dynamics, 1) = -rd_.G;
     A_idx += constraint_size_dynamics;
-    //torque min
-    lbA_wbid.block(A_idx, 0, constraint_size_torque,   1) =-rd_.torque_limit;
-    A_idx += constraint_size_torque;
-    //contact equality
-    lbA_wbid.block(A_idx, 0, constraint_size_contact,  1) = -J_contact_dot * rd_.q_dot_virtual_;
-    A_idx += constraint_size_contact;
     //friction constraint
     lbA_wbid.block(A_idx, 0, constraint_size_friction, 1).setConstant(-std::numeric_limits<double>::infinity());
 
@@ -12048,12 +11936,6 @@ Eigen::VectorQd AvatarController::MitWholebodyInverseDynamicsController(const Ei
     A_idx = 0;
     ubA_wbid.block(A_idx, 0, constraint_size_dynamics, 1) = -rd_.G;
     A_idx += constraint_size_dynamics;
-    //torque max
-    ubA_wbid.block(A_idx, 0, constraint_size_torque,   1) = rd_.torque_limit;
-    A_idx += constraint_size_torque;
-    //contact equality
-    ubA_wbid.block(A_idx, 0, constraint_size_contact,  1) = -J_contact_dot * rd_.q_dot_virtual_;
-    A_idx += constraint_size_contact;
     //friction constraint
     ubA_wbid.block(A_idx, 0, constraint_size_friction, 1).setZero();
 
