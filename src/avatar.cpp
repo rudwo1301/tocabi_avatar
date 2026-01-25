@@ -621,6 +621,7 @@ void AvatarController::computeSlow()
                 //getFootTrajectory_stepping();
                 getFootTrajectory();
                 getPelvTrajectory(); 
+
                 supportToFloatPattern();
                 computeIkControl_MJ(pelv_trajectory_float_, lfoot_trajectory_float_, rfoot_trajectory_float_, q_des_);
 
@@ -8675,10 +8676,15 @@ void AvatarController::getPelvTrajectory()
 {
     double z_rot = foot_step_support_frame_(current_step_num_, 5);
 
-    pelv_trajectory_support_.translation()(0) = pelv_support_current_.translation()(0) + 0.7 * (com_desired_(0) - com_support_current_(0));
-    //pelv_trajectory_support_.translation()(1) = pelv_support_current_.translation()(1) + 0.7 * (com_desired_(1) - com_support_current_(1));
-    pelv_trajectory_support_.translation()(1) = pelv_support_current_.translation()(1) + 0.9 * (com_desired_(1) - com_support_current_(1));
-    pelv_trajectory_support_.translation()(2) = pelv_support_current_.translation()(2) + 1.0 * (com_desired_(2) - com_support_current_(2));
+    pelv_trajectory_support_.translation()(0) = pelv_support_current_.translation()(0) 
+                                              + 0.70 * (com_desired_(0)     - com_support_current_(0))
+                                              + 0.05 * (com_dot_desired_(0) - com_float_current_dot_LPF(0));
+    pelv_trajectory_support_.translation()(1) = pelv_support_current_.translation()(1) 
+                                              + 0.90 * (com_desired_(1)     - com_support_current_(1))
+                                              + 0.05 * (com_dot_desired_(1) - com_float_current_dot_LPF(1));
+    pelv_trajectory_support_.translation()(2) = pelv_support_current_.translation()(2) 
+                                              + 1.00 * (com_desired_(2) - com_support_current_(2))
+                                              + 0.05 * (com_dot_desired_(2) - com_float_current_dot_LPF(2));
 
     Eigen::Vector3d Trunk_trajectory_euler;
     Trunk_trajectory_euler.setZero();
@@ -8900,12 +8906,13 @@ void AvatarController::getComTrajectory_mpc()
     com_desired_(1) = Planner_state_main_calc_(3);
     com_desired_(2) = Planner_state_main_calc_(6);
 
-    dcm_desired_(0) = Planner_state_main_calc_(0) + Planner_state_main_calc_(1)/w_;
-    dcm_desired_(1) = MPC_Planner_state_main_(3) + MPC_Planner_state_main_(4)/w_;
-    dcm_desired_(2) = Planner_state_main_calc_(6) + Planner_state_main_calc_(7)/w_;
+    com_dot_desired_(0) = Planner_state_main_calc_(1);
+    com_dot_desired_(1) = Planner_state_main_calc_(4);
+    com_dot_desired_(2) = Planner_state_main_calc_(7);
 
-    cp_desired_(0) = dcm_desired_(0);
-    cp_desired_(1) = dcm_desired_(1);
+    vrp_desired_(0) = MPC_Stabilizer_state_main_(2);
+    vrp_desired_(1) = MPC_Stabilizer_state_main_(5);
+    vrp_desired_(2) = MPC_Stabilizer_state_main_(8);
 
     step_enable_bool_main_ = step_enable_bool_one_tick_main_;
 
@@ -11086,7 +11093,7 @@ void AvatarController::parameterSetting()
     target_z_ = 0.0;
     com_height_ = 0.71;
     target_theta_ = 0.0;
-    step_length_x_ = 0.20;
+    step_length_x_ = 0.15;
     step_length_y_ = 0.0;
     is_right_foot_swing_ = 1;
     
@@ -11190,18 +11197,12 @@ void AvatarController::CP_compen_MJ_FT()
     double ZMP_Y_DES_CALC = 0.0;
     double lambda_desired = 0.0;
 
-    vrp_desired_ << MPC_Stabilizer_state_main_(2), MPC_Stabilizer_state_main_(5), MPC_Stabilizer_state_main_(8);
-
     double X_foot_Center = ref_zmp_wo_offset_(walking_tick_ - ((bool)current_step_num_)*t_start_, 0);
     double Y_foot_Center = ref_zmp_wo_offset_(walking_tick_ - ((bool)current_step_num_)*t_start_, 1);
 
-    //lambda_desired = (com_support_current_(2) - MPC_Stabilizer_state_main_(8) + GRAVITY*b_*b_)/(com_support_current_(2)*b_*b_);
-    //ZMP_X_DES_CALC = (MPC_Stabilizer_state_main_(2) - (1 - lambda_desired*b_*b_)*com_support_current_(0))/(lambda_desired*b_*b_);
-    //ZMP_Y_DES_CALC = (MPC_Stabilizer_state_main_(5) - (1 - lambda_desired*b_*b_)*com_support_current_(1))/(lambda_desired*b_*b_);
-
-    lambda_desired = (MPC_Stabilizer_state_main_(6) - MPC_Stabilizer_state_main_(8) + GRAVITY*b_*b_)/(MPC_Stabilizer_state_main_(6)*b_*b_);
-    ZMP_X_DES_CALC = (MPC_Stabilizer_state_main_(2) - (1 - lambda_desired*b_*b_)*MPC_Stabilizer_state_main_(0))/(lambda_desired*b_*b_);
-    ZMP_Y_DES_CALC = (MPC_Stabilizer_state_main_(5) - (1 - lambda_desired*b_*b_)*MPC_Stabilizer_state_main_(3))/(lambda_desired*b_*b_);
+    lambda_desired = (com_desired_(2) - vrp_desired_(2) + GRAVITY*b_*b_)/(com_desired_(2)*b_*b_);
+    ZMP_X_DES_CALC = (vrp_desired_(0) - (1 - lambda_desired*b_*b_)*com_desired_(0))/(lambda_desired*b_*b_);
+    ZMP_Y_DES_CALC = (vrp_desired_(1) - (1 - lambda_desired*b_*b_)*com_desired_(1))/(lambda_desired*b_*b_);
 
     ZMP_X_DES_CALC = DyrosMath::minmax_cut(ZMP_X_DES_CALC, X_foot_Center - zmp_x_min_foot_width_, X_foot_Center + zmp_x_max_foot_width_);
     ZMP_Y_DES_CALC = DyrosMath::minmax_cut(ZMP_Y_DES_CALC, Y_foot_Center - zmp_y_min_foot_width_, Y_foot_Center + zmp_y_max_foot_width_);
@@ -11350,14 +11351,12 @@ void AvatarController::contactWrenchCalculator()
     double ZMP_Y_DES_CALC = 0.0;
     double lambda_desired = 0.0;
 
-    vrp_desired_ << MPC_Stabilizer_state_main_(2), MPC_Stabilizer_state_main_(5), MPC_Stabilizer_state_main_(8);
-
     double X_foot_Center = ref_zmp_wo_offset_(walking_tick_ - ((bool)current_step_num_)*t_start_, 0);
     double Y_foot_Center = ref_zmp_wo_offset_(walking_tick_ - ((bool)current_step_num_)*t_start_, 1);
 
-    lambda_desired = (MPC_Stabilizer_state_main_(6) - MPC_Stabilizer_state_main_(8) + GRAVITY*b_*b_)/(MPC_Stabilizer_state_main_(6)*b_*b_);
-    ZMP_X_DES_CALC = (MPC_Stabilizer_state_main_(2) - (1 - lambda_desired*b_*b_)*MPC_Stabilizer_state_main_(0))/(lambda_desired*b_*b_);
-    ZMP_Y_DES_CALC = (MPC_Stabilizer_state_main_(5) - (1 - lambda_desired*b_*b_)*MPC_Stabilizer_state_main_(3))/(lambda_desired*b_*b_);
+    lambda_desired = (com_desired_(2) - vrp_desired_(2) + GRAVITY*b_*b_)/(com_desired_(2)*b_*b_);
+    ZMP_X_DES_CALC = (vrp_desired_(0) - (1 - lambda_desired*b_*b_)*com_desired_(0))/(lambda_desired*b_*b_);
+    ZMP_Y_DES_CALC = (vrp_desired_(1) - (1 - lambda_desired*b_*b_)*com_desired_(1))/(lambda_desired*b_*b_);
 
     ZMP_X_DES_CALC = DyrosMath::minmax_cut(ZMP_X_DES_CALC, X_foot_Center - zmp_x_min_foot_width_, X_foot_Center + zmp_x_max_foot_width_);
     ZMP_Y_DES_CALC = DyrosMath::minmax_cut(ZMP_Y_DES_CALC, Y_foot_Center - zmp_y_min_foot_width_, Y_foot_Center + zmp_y_max_foot_width_);
@@ -11371,8 +11370,8 @@ void AvatarController::contactWrenchCalculator()
     alpha = (ZMP_Y_DES_CALC - (rfoot_support_current_.translation()(1) + calc_z_max)) / ((lfoot_support_current_.translation()(1) - calc_z_max) - (rfoot_support_current_.translation()(1) + calc_z_max));
     alpha = DyrosMath::minmax_cut(alpha, 0.0, 1.0);
 
-    F_R = -(1 - alpha) * (rd_.link_[COM_id].mass) * lambda_desired * MPC_Stabilizer_state_main_(6);
-    F_L =     - alpha  * (rd_.link_[COM_id].mass) * lambda_desired * MPC_Stabilizer_state_main_(6);
+    F_R = -(1 - alpha) * (rd_.link_[COM_id].mass) * lambda_desired * com_desired_(2);
+    F_L =     - alpha  * (rd_.link_[COM_id].mass) * lambda_desired * com_desired_(2);
 
     //////////// TORQUE ////////////
     Tau_all_x = -((rfoot_support_current_.translation()(1) - ZMP_Y_DES_CALC) * F_R + (lfoot_support_current_.translation()(1) - ZMP_Y_DES_CALC) * F_L);

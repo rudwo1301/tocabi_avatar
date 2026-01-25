@@ -1334,6 +1334,7 @@ public:
 
     double UX_mj_, UY_mj_, UZ_mj_; 
     Eigen::Vector3d com_desired_;
+    Eigen::Vector3d com_dot_desired_;
     Eigen::MatrixXd foot_step_;
     Eigen::MatrixXd foot_step_support_frame_;
     Eigen::MatrixXd foot_step_support_frame_container_to_mpc_;
