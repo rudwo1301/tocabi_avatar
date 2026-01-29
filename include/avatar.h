@@ -1401,12 +1401,10 @@ public:
     bool   param_stepping_stone_;
     bool   param_loco_manipulation_;
 
-    //double zmp_x_max = 0.16;
-    double zmp_x_max = 0.11;
-    //double zmp_x_min = 0.10;
-    double zmp_x_min = 0.05;
-    double zmp_x_max_foot_width_ = 0.18;
-    double zmp_x_min_foot_width_ = 0.12;
+    double zmp_x_max = 0.17;
+    double zmp_x_min = 0.11;
+    double zmp_x_max_foot_width_ = 0.17;
+    double zmp_x_min_foot_width_ = 0.11;
     //double zmp_y_max = 0.10;
     //double zmp_y_min = 0.10;
     double zmp_y_max = 0.075;
@@ -1707,6 +1705,10 @@ public:
     Eigen::VectorQd torque_wbd_;
     Eigen::VectorQd torque_wbd_container_to_fast_;
     Eigen::VectorQd torque_wbd_fast_;
+
+    Eigen::VectorQd torque_sum_;
+    Eigen::VectorQd torque_sum_lpf_;
+    Eigen::VectorQd torque_pd_;
     
     Eigen::VectorQd torque_desired_prev_;
     Eigen::VectorQd torque_desired_prev_container_to_fast_;
