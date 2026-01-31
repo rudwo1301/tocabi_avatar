@@ -1428,6 +1428,8 @@ public:
     std::atomic<bool> atb_main_to_mpc_update_{false};
     std::atomic<bool> atb_mpc_to_main_update_{false};
 
+    int MPC_first_loop_ = 0;
+
     double com_start_tick_;
     double com_start_tick_mpc_;
     double com_start_tick_container_to_mpc_;
@@ -1757,6 +1759,7 @@ public:
 private:    
     unsigned int walking_tick_ = 0;
     unsigned int scenario_tick_ = 0;
+    unsigned int scenario_num_  = 0;
     unsigned int walking_tick_mpc_ = 0;
     unsigned int walking_tick_container_to_mpc_ = 0;
     unsigned int initial_tick_ = 0;
