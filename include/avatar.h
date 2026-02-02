@@ -1766,7 +1766,7 @@ public:
 
 private:    
     unsigned int walking_tick_ = 0;
-    unsigned int scenario_tick_ = 0;
+    unsigned int mpc_tick_ = 0;
     unsigned int scenario_num_  = 0;
     unsigned int walking_tick_mpc_ = 0;
     unsigned int walking_tick_container_to_mpc_ = 0;
