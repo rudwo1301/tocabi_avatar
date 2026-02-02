@@ -615,16 +615,34 @@ void AvatarController::computeSlow()
 
                 if(scenario_num_ && walking_tick_ < t_temp_ - 1.0*hz_)
                 {
-                    double calc_13_1 = DyrosMath::cubic(walking_tick_, t_temp_ - 4.0*hz_, t_temp_ - 3.0*hz_, 0.15, 0.40, 0.0, 0.0);
+                    double calc_13_1 = DyrosMath::cubic(walking_tick_, t_temp_ - 8.0*hz_, t_temp_ - 7.0*hz_, Initial_ref_q_(13), 0.40, 0.0, 0.0);
                     double calc_13_2 = DyrosMath::cubic(walking_tick_, t_temp_ - 2.0*hz_, t_temp_ - 1.0*hz_, 0.40, 0.15, 0.0, 0.0);
                     
                     CAM_upper_init_q_(13) = min(calc_13_1, calc_13_2);
                     
-                    CAM_upper_init_q_(16) = DyrosMath::cubic(walking_tick_, t_temp_ - 4.0*hz_, t_temp_ - 2.0*hz_,  0.174533,  0.174533 - 0.5, 0.0, 0.0);
-                    CAM_upper_init_q_(26) = DyrosMath::cubic(walking_tick_, t_temp_ - 4.0*hz_, t_temp_ - 2.0*hz_, -0.174533, -0.174533 + 0.5, 0.0, 0.0);
+                    CAM_upper_init_q_(15) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(15),  0.00, 0.0, 0.0);
+                    CAM_upper_init_q_(25) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(25), -0.00, 0.0, 0.0);
+
+                    CAM_upper_init_q_(16) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(16), -0.50, 0.0, 0.0);
+                    CAM_upper_init_q_(26) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(26),  0.50, 0.0, 0.0);
+
+                    CAM_upper_init_q_(17) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(17),  1.40, 0.0, 0.0);
+                    CAM_upper_init_q_(27) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(27), -1.40, 0.0, 0.0);
                     
-                    CAM_upper_init_q_(17) = DyrosMath::cubic(walking_tick_, t_temp_ - 4.0*hz_, t_temp_ - 2.0*hz_,  1.134460,  1.134460 + 0.4, 0.0, 0.0);
-                    CAM_upper_init_q_(27) = DyrosMath::cubic(walking_tick_, t_temp_ - 4.0*hz_, t_temp_ - 2.0*hz_, -1.134460, -1.134460 - 0.4, 0.0, 0.0);
+                    CAM_upper_init_q_(18) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(18), -1.57, 0.0, 0.0);
+                    CAM_upper_init_q_(28) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(28),  1.57, 0.0, 0.0);
+
+                    CAM_upper_init_q_(19) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(19), -1.12, 0.0, 0.0);
+                    CAM_upper_init_q_(29) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(29),  1.12, 0.0, 0.0);
+
+                    CAM_upper_init_q_(20) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(20),  1.31, 0.0, 0.0);
+                    CAM_upper_init_q_(30) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(30), -1.31, 0.0, 0.0);
+
+                    CAM_upper_init_q_(21) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(21), -1.57, 0.0, 0.0);
+                    CAM_upper_init_q_(31) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(31),  1.57, 0.0, 0.0);
+
+                    CAM_upper_init_q_(22) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(22),  0.00, 0.0, 0.0);
+                    CAM_upper_init_q_(32) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(32), -0.00, 0.0, 0.0);
                 }
 
                 ref_q_.segment(0, 12) = q_des_;
@@ -5550,11 +5568,15 @@ void AvatarController::computeThread3()
     //double preview_time = 0.7;
     double preview_time = 0.9;
     //double preview_time = 1.2;
+
     IS_FIPM_CoM_Planner_MPC(thread3_hz_, 1.0/thread3_hz_, preview_time, 2000/thread3_hz_);
 
     std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
     e_mpc_time_graph << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()*1e-6 << ",";
-    IS_FIPM_3D_DCM_Stabililzer_MPC(thread3_hz_, preview_time);
+    if(current_step_num_mpc_== 0 || walking_tick_mpc_ - com_start_tick_mpc_ < 2*t_total_mpc_ - hz_/thread3_hz_)
+    {
+        IS_FIPM_3D_DCM_Stabililzer_MPC(thread3_hz_, preview_time);
+    }
 
     //send mpc data
     if(atb_mpc_to_main_update_ == false)
@@ -5583,7 +5605,7 @@ void AvatarController::computeThread3()
         atb_mpc_to_main_update_ = false;
     }
     mpc_update_ = true;
-
+    
     econom2_thread_stepchange();
     std::chrono::steady_clock::time_point t3 = std::chrono::steady_clock::now();
 
@@ -5599,7 +5621,7 @@ void AvatarController::econom2_thread_stepchange()
 
     foot_step_support_frame_mpc_(current_step_num_mpc_, 0) += del_F_mpc(0);
     foot_step_support_frame_mpc_(current_step_num_mpc_, 1) += del_F_mpc(1);
-    if((walking_tick_mpc_ - (t_start_mpc_ + t_total_mpc_) >= -hz_/thread3_hz_) && (current_step_num_mpc_ < total_step_num_ - 1))
+    if((walking_tick_mpc_ - (t_start_mpc_ + 1*t_total_mpc_) >= -hz_/thread3_hz_) && (current_step_num_mpc_ < total_step_num_ - 1))
     {
         Eigen::Vector3d var_after_step_change, var_before_step_change, frame_pos_diff;
         Eigen::Matrix3d frame_rot_diff;
@@ -6322,7 +6344,8 @@ void AvatarController::updateInitialState()
         cout << "total step num: " << total_step_num_ << endl;
         xi_mj_ = com_support_init_(0); // preview parameter
         yi_mj_ = com_support_init_(1);
-        zc_mj_ = com_support_init_(2);
+        if(!(bool)(scenario_num_))
+        { zc_mj_ = com_support_init_(2); }
     }
     else if (current_step_num_ != 0 && walking_tick_ == t_start_) // step change
     {
@@ -7829,12 +7852,6 @@ void AvatarController::onestepVrpZ(unsigned int current_step_number, double t_to
 
     double height_diff = 0.0;
 
-    height_diff_vec_(0) = 0.0;
-    height_diff_vec_(1) = 0.0;
-    height_diff_vec_(2) = 0.10;
-    height_diff_vec_(3) = 0.10;
-    height_diff_vec_(4) = 0.0;
-
     for(int i = 0; i < total_step_num_; i++) { if(current_step_number == i) { height_diff = - height_diff_vec_(i); } }
     
     height_diff = DyrosMath::minmax_cut(height_diff, -0.20, 0.05);
@@ -8935,6 +8952,20 @@ void AvatarController::getComTrajectory_mpc()
         mpc_update_ = false;
     }
 
+    e_tmp_graph17 << MPC_Stabilizer_state_main_.transpose() << endl;
+    if(walking_tick_ < hz_/thread3_hz_)
+    {
+        MPC_Planner_state_main_(0) = com_support_current_(0); 
+        MPC_Planner_state_main_(2) = com_support_current_(0); 
+        MPC_Planner_state_main_(3) = yi_mj_;
+        MPC_Planner_state_main_(5) = yi_mj_;
+        MPC_Planner_state_main_(6) = zc_mj_;
+        MPC_Planner_state_main_(8) = zc_mj_;
+
+        MPC_Stabilizer_state_main_ = MPC_Planner_state_main_;
+    }
+    e_tmp_graph18 << MPC_Stabilizer_state_main_.transpose() << endl;
+
     Planner_state_main_calc_.segment(0,3) = A_main_*Planner_state_main_calc_.segment(0,3) + B_main_*MPC_Planner_u_main_(0);
     Planner_state_main_calc_.segment(3,3) = A_main_*Planner_state_main_calc_.segment(3,3) + B_main_*MPC_Planner_u_main_(1);
     Planner_state_main_calc_.segment(6,3) = A_main_*Planner_state_main_calc_.segment(6,3) + B_main_*MPC_Planner_u_main_(2);
@@ -9883,12 +9914,12 @@ void AvatarController::IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, d
         MPC_Planner_u_mpc_sep_(2) = MPC_Planner_u_mpc_(2*N_plan_mpc);
     }
 
-    e_mpc_planner_data << N_plan_mpc                << "," << 0                         << "," << 0                         << ","
+    e_mpc_planner_data << N_plan_mpc                << "," << walking_tick_mpc_         << "," << current_step_num_mpc_     << ","
                        << Pv_x_ref(0)               << "," << Pv_y_ref(0)               << "," << Pv_z_ref(0)               << ","
                        << MPC_Planner_state_mpc_(0) << "," << MPC_Planner_state_mpc_(3) << "," << MPC_Planner_state_mpc_(6) << ","
                        << MPC_Planner_state_mpc_(1) << "," << MPC_Planner_state_mpc_(4) << "," << MPC_Planner_state_mpc_(7) << ","
                        << MPC_Planner_state_mpc_(2) << "," << MPC_Planner_state_mpc_(5) << "," << MPC_Planner_state_mpc_(8) << ","
-                       << zmp_max_x_mpc_(0)         << "," << zmp_max_y_mpc_(0)         << "," << 0                         << ","
+                       << zmp_max_x_mpc_(0)         << "," << zmp_max_y_mpc_(0)         << "," << com_start_tick_mpc_       << ","
                        << endl;
 
     Eigen::VectorXd data_save_calc; data_save_calc.setZero(3*N_plan_mpc);
@@ -10206,11 +10237,11 @@ void AvatarController::IS_FIPM_3D_DCM_Stabililzer_MPC(double mpc_freq, double pr
         MPC_Stabilizer_aux_mpc_ << MPC_Stabilizer_aux_mpc_x_, MPC_Stabilizer_aux_mpc_y_;
     }
 
-    step_enable_bool_mpc_          = (bool)(current_step_num_mpc_)*(bool)(mpc_tick                   < t_total_const_ - t_dsp2_const_ - step_enable_time_fwd_*hz_ - step_enable_fix_time_pre_*hz_);
-    step_enable_bool_one_tick_mpc_ = (bool)(current_step_num_mpc_)*(bool)(mpc_tick + MPC_synchro_hz_ < t_total_const_ - t_dsp2_const_ - step_enable_time_fwd_*hz_ - step_enable_fix_time_pre_*hz_);
+    //step_enable_bool_mpc_          = (bool)(current_step_num_mpc_)*(bool)(mpc_tick                   < t_total_const_ - t_dsp2_const_ - step_enable_time_fwd_*hz_ - step_enable_fix_time_pre_*hz_);
+    //step_enable_bool_one_tick_mpc_ = (bool)(current_step_num_mpc_)*(bool)(mpc_tick + MPC_synchro_hz_ < t_total_const_ - t_dsp2_const_ - step_enable_time_fwd_*hz_ - step_enable_fix_time_pre_*hz_);
 
-    //step_enable_bool_mpc_          = (bool)((mpc_tick > 0.4*t_temp_)&&(mpc_tick                   < (1 - (bool)(current_step_num_mpc_))*t_temp_ + t_total_const_ - t_dsp2_const_ - step_enable_time_fwd_*hz_ - step_enable_fix_time_pre_*hz_));
-    //step_enable_bool_one_tick_mpc_ = (bool)((mpc_tick > 0.4*t_temp_)&&(mpc_tick + MPC_synchro_hz_ < (1 - (bool)(current_step_num_mpc_))*t_temp_ + t_total_const_ - t_dsp2_const_ - step_enable_time_fwd_*hz_ - step_enable_fix_time_pre_*hz_));
+    step_enable_bool_mpc_          = (bool)((mpc_tick > 0.4*t_temp_)&&(mpc_tick                   < (1 - (bool)(current_step_num_mpc_))*t_temp_ + t_total_const_ - t_dsp2_const_ - step_enable_time_fwd_*hz_ - step_enable_fix_time_pre_*hz_));
+    step_enable_bool_one_tick_mpc_ = (bool)((mpc_tick > 0.4*t_temp_)&&(mpc_tick + MPC_synchro_hz_ < (1 - (bool)(current_step_num_mpc_))*t_temp_ + t_total_const_ - t_dsp2_const_ - step_enable_time_fwd_*hz_ - step_enable_fix_time_pre_*hz_));
 
     Eigen::VectorXd data_save_calc; data_save_calc.setZero(2*N_stab_mpc);
     data_save_calc << zmp_max_x_mpc_.segment(0, N_stab_mpc), zmp_max_y_mpc_.segment(0, N_stab_mpc);
@@ -10761,8 +10792,10 @@ e_tmp_graph24 << data_save_calc.transpose() << endl;
                           << zmp_max_x_mpc_(0)                   << "," << zmp_max_y_mpc_(0)                   << "," << 0                            << ","
                           << prev_zmp(0, 0)                      << "," << prev_zmp(1, 0)                      << "," << 0                            << ","
                           << MPC_Stabilizer_delf_mpc_x_(0)       << "," << MPC_Stabilizer_delf_mpc_y_(0)       << "," << 0                            << ","
-                          << step_x_norm                         << "," << step_y_norm                         << "," << 0                            << ","
+                          << step_x_norm                         << "," << step_y_norm                         << "," << b_                           << ","
                           << MPC_Stabilizer_time_adj_tick_x_mpc_ << "," << calc_time_adj                       << "," << time_adj_tick_mpc            << ","
+                          << com_measured_mpc_(0)                << "," << com_measured_mpc_(1)                << "," << com_measured_mpc_(2)         << ","
+                          << com_dot_measured_mpc_(0)            << "," << com_dot_measured_mpc_(1)            << "," << com_dot_measured_mpc_(2)     << ","
                           << endl;
 
     data_save_calc.setZero(2*N_stab_mpc);
@@ -11162,7 +11195,7 @@ void AvatarController::parameterSetting()
     foot_height_ = 0.055;
     //foot_height_ = 0.075;
 
-    t_temp_ = 4.0 * hz_ + 2.0 * hz_*(bool)(scenario_num_);
+    t_temp_ = 4.0 * hz_ + 10.0 * hz_*(bool)(scenario_num_);
     t_last_ = t_total_ + t_temp_;
     t_start_ = t_temp_ + 1;
 
