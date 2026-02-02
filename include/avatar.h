@@ -1133,6 +1133,8 @@ public:
     
     Eigen::Isometry3d rfoot_trajectory_support_;  //local frame
     Eigen::Isometry3d lfoot_trajectory_support_;
+    Eigen::Isometry3d rfoot_trajectory_support_ideal_;
+    Eigen::Isometry3d lfoot_trajectory_support_ideal_;
     Eigen::Vector3d rfoot_trajectory_euler_support_;
     Eigen::Vector3d lfoot_trajectory_euler_support_;
 
@@ -1616,6 +1618,9 @@ public:
 
     Eigen::VectorXd MPC_Stabilizer_state_container_from_mpc_;
     Eigen::VectorXd MPC_Stabilizer_state_main_;
+    Eigen::VectorXd MPC_Stabilizer_state_main_p_;
+    Eigen::VectorXd MPC_Stabilizer_state_main_diff_;
+    Eigen::VectorXd MPC_Stabilizer_state_main_i_;
     Eigen::VectorXd MPC_Stabilizer_state_mpc_;
     Eigen::VectorXd Stabilizer_state_main_calc_; 
     Eigen::VectorXd MPC_Stabilizer_delf_mpc_;
@@ -1636,6 +1641,8 @@ public:
     Eigen::VectorXd MPC_Stabilizer_aux_mpc_x_;
     Eigen::VectorXd MPC_Stabilizer_aux_mpc_y_;
     Eigen::VectorXd MPC_Stabilizer_aux_main_;
+
+    int MPC_Stabilizer_interpol_;
 
     Eigen::VectorXd MPC_Stabilizer_u_mpc_;
     Eigen::VectorXd MPC_Stabilizer_u_mpc_sep_;
@@ -1715,6 +1722,7 @@ public:
     Eigen::VectorQd torque_desired_prev_;
     Eigen::VectorQd torque_desired_prev_container_to_fast_;
     Eigen::VectorQd torque_desired_prev_fast_;
+    Eigen::VectorQd torque_desired_LPF_;
 
     Eigen::Vector6d lfoot_contact_wrench_;
     Eigen::Vector6d rfoot_contact_wrench_;
