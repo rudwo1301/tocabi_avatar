@@ -1128,11 +1128,13 @@ public:
     Eigen::VectorQd q_prev_MJ_;
 
     Eigen::Vector12d q_des_;
+    Eigen::Vector12d q_des_refine_;
     
     Eigen::Isometry3d pelv_trajectory_support_; //local frame
     
     Eigen::Isometry3d rfoot_trajectory_support_;  //local frame
     Eigen::Isometry3d lfoot_trajectory_support_;
+
     Eigen::Isometry3d rfoot_trajectory_support_ideal_;
     Eigen::Isometry3d lfoot_trajectory_support_ideal_;
     Eigen::Vector3d rfoot_trajectory_euler_support_;
@@ -1141,6 +1143,12 @@ public:
     Eigen::Isometry3d pelv_trajectory_float_; //pelvis frame
     Eigen::Isometry3d rfoot_trajectory_float_;
     Eigen::Isometry3d lfoot_trajectory_float_;
+
+    Eigen::Isometry3d lfoot_trajectory_float_compen_;
+    Eigen::Isometry3d rfoot_trajectory_float_compen_;
+
+    Eigen::Isometry3d rfoot_trajectory_float_b_;
+    Eigen::Isometry3d lfoot_trajectory_float_b_;
 
     Eigen::Vector3d pelv_support_euler_init_;
     Eigen::Vector3d lfoot_support_euler_init_;
@@ -1304,6 +1312,7 @@ public:
     double t_start_mpc_;
     double t_start_container_to_mpc_;
     double t_temp_;  
+    double t_end_;
     double t_dsp1_;
     double t_dsp2_;
     double t_dsp1_const_;
