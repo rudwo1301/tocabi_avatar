@@ -1128,13 +1128,11 @@ public:
     Eigen::VectorQd q_prev_MJ_;
 
     Eigen::Vector12d q_des_;
-    Eigen::Vector12d q_des_refine_;
     
     Eigen::Isometry3d pelv_trajectory_support_; //local frame
     
     Eigen::Isometry3d rfoot_trajectory_support_;  //local frame
     Eigen::Isometry3d lfoot_trajectory_support_;
-
     Eigen::Isometry3d rfoot_trajectory_support_ideal_;
     Eigen::Isometry3d lfoot_trajectory_support_ideal_;
     Eigen::Vector3d rfoot_trajectory_euler_support_;
@@ -1143,12 +1141,6 @@ public:
     Eigen::Isometry3d pelv_trajectory_float_; //pelvis frame
     Eigen::Isometry3d rfoot_trajectory_float_;
     Eigen::Isometry3d lfoot_trajectory_float_;
-
-    Eigen::Isometry3d lfoot_trajectory_float_compen_;
-    Eigen::Isometry3d rfoot_trajectory_float_compen_;
-
-    Eigen::Isometry3d rfoot_trajectory_float_b_;
-    Eigen::Isometry3d lfoot_trajectory_float_b_;
 
     Eigen::Vector3d pelv_support_euler_init_;
     Eigen::Vector3d lfoot_support_euler_init_;
@@ -1312,7 +1304,6 @@ public:
     double t_start_mpc_;
     double t_start_container_to_mpc_;
     double t_temp_;  
-    double t_end_;
     double t_dsp1_;
     double t_dsp2_;
     double t_dsp1_const_;
@@ -1412,10 +1403,12 @@ public:
     bool   param_stepping_stone_;
     bool   param_loco_manipulation_;
 
-    double zmp_x_max = 0.17;
-    double zmp_x_min = 0.11;
-    double zmp_x_max_foot_width_ = 0.17;
-    double zmp_x_min_foot_width_ = 0.11;
+    //double zmp_x_max = 0.16;
+    double zmp_x_max = 0.11;
+    //double zmp_x_min = 0.10;
+    double zmp_x_min = 0.05;
+    double zmp_x_max_foot_width_ = 0.18;
+    double zmp_x_min_foot_width_ = 0.12;
     //double zmp_y_max = 0.10;
     //double zmp_y_min = 0.10;
     double zmp_y_max = 0.075;
@@ -1438,8 +1431,6 @@ public:
     //Common
     std::atomic<bool> atb_main_to_mpc_update_{false};
     std::atomic<bool> atb_mpc_to_main_update_{false};
-
-    int MPC_first_loop_ = 0;
 
     double com_start_tick_;
     double com_start_tick_mpc_;
@@ -1723,10 +1714,6 @@ public:
     Eigen::VectorQd torque_wbd_;
     Eigen::VectorQd torque_wbd_container_to_fast_;
     Eigen::VectorQd torque_wbd_fast_;
-
-    Eigen::VectorQd torque_sum_;
-    Eigen::VectorQd torque_sum_lpf_;
-    Eigen::VectorQd torque_pd_;
     
     Eigen::VectorQd torque_desired_prev_;
     Eigen::VectorQd torque_desired_prev_container_to_fast_;
@@ -1775,7 +1762,7 @@ public:
 
 private:    
     unsigned int walking_tick_ = 0;
-    unsigned int mpc_tick_ = 0;
+    unsigned int scenario_tick_ = 0;
     unsigned int scenario_num_  = 0;
     unsigned int walking_tick_mpc_ = 0;
     unsigned int walking_tick_container_to_mpc_ = 0;
