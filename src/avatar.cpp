@@ -11193,7 +11193,7 @@ void AvatarController::updateNextStepTime()
             {
                 Initial_ref_q_(i) = ref_q_(i);
             }
-            cout << "scenario change to " << scenario_num_ << endl;
+            cout << "scenario num: " << scenario_num_ << endl;
         }
         else if(!end_message_printed)
         {
