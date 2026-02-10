@@ -1146,6 +1146,9 @@ public:
     Eigen::Vector3d lfoot_support_euler_init_;
     Eigen::Vector3d rfoot_support_euler_init_;
 
+    Eigen::Vector3d lfoot_float_euler_init_;
+    Eigen::Vector3d rfoot_float_euler_init_;
+
     Eigen::Vector3d del_ang_momentum_;
     Eigen::Vector3d del_ang_momentum_prev_;
 
@@ -1233,6 +1236,10 @@ public:
     Eigen::Isometry3d rfoot_support_current_calc_;
     Eigen::Vector6d   lfoot_support_current_dot_;
     Eigen::Vector6d   rfoot_support_current_dot_;
+    Eigen::Isometry3d lfoot_support_current_mpc_;
+    Eigen::Isometry3d rfoot_support_current_mpc_;
+    Eigen::Isometry3d lfoot_support_current_container_to_mpc_;
+    Eigen::Isometry3d rfoot_support_current_container_to_mpc_;
 
     Eigen::Isometry3d lfoot_support_init_;
     Eigen::Isometry3d rfoot_support_init_;
