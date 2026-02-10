@@ -1410,18 +1410,14 @@ public:
     bool   param_stepping_stone_;
     bool   param_loco_manipulation_;
 
-    //double zmp_x_max = 0.16;
-    double zmp_x_max = 0.11;
-    //double zmp_x_min = 0.10;
-    double zmp_x_min = 0.05;
-    double zmp_x_max_foot_width_ = 0.18;
-    double zmp_x_min_foot_width_ = 0.12;
-    //double zmp_y_max = 0.10;
-    //double zmp_y_min = 0.10;
+    double zmp_x_max = 0.15;
+    double zmp_x_min = 0.09;
+    double zmp_x_max_foot_width_ = 0.17;
+    double zmp_x_min_foot_width_ = 0.11;
     double zmp_y_max = 0.075;
     double zmp_y_min = 0.075;
-    double zmp_y_max_foot_width_ = 0.075;
-    double zmp_y_min_foot_width_ = 0.075;
+    double zmp_y_max_foot_width_ = 0.085;
+    double zmp_y_min_foot_width_ = 0.085;
 
     Eigen::Vector3d foot_pos_compen_;
     Eigen::Vector3d foot_ori_compen_;
