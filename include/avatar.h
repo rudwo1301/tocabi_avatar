@@ -1146,9 +1146,6 @@ public:
     Eigen::Vector3d lfoot_support_euler_init_;
     Eigen::Vector3d rfoot_support_euler_init_;
 
-    Eigen::Vector3d lfoot_float_euler_init_;
-    Eigen::Vector3d rfoot_float_euler_init_;
-
     Eigen::Vector3d del_ang_momentum_;
     Eigen::Vector3d del_ang_momentum_prev_;
 
@@ -1236,10 +1233,6 @@ public:
     Eigen::Isometry3d rfoot_support_current_calc_;
     Eigen::Vector6d   lfoot_support_current_dot_;
     Eigen::Vector6d   rfoot_support_current_dot_;
-    Eigen::Isometry3d lfoot_support_current_mpc_;
-    Eigen::Isometry3d rfoot_support_current_mpc_;
-    Eigen::Isometry3d lfoot_support_current_container_to_mpc_;
-    Eigen::Isometry3d rfoot_support_current_container_to_mpc_;
 
     Eigen::Isometry3d lfoot_support_init_;
     Eigen::Isometry3d rfoot_support_init_;
@@ -1414,6 +1407,8 @@ public:
     double zmp_x_min = 0.09;
     double zmp_x_max_foot_width_ = 0.17;
     double zmp_x_min_foot_width_ = 0.11;
+    //double zmp_y_max = 0.10;
+    //double zmp_y_min = 0.10;
     double zmp_y_max = 0.075;
     double zmp_y_min = 0.075;
     double zmp_y_max_foot_width_ = 0.085;
@@ -1435,12 +1430,16 @@ public:
     std::atomic<bool> atb_main_to_mpc_update_{false};
     std::atomic<bool> atb_mpc_to_main_update_{false};
 
+    int MPC_first_loop_ = 0;
+
     double com_start_tick_;
     double com_start_tick_mpc_;
     double com_start_tick_container_to_mpc_;
 
     int current_step_num_container_to_mpc_;
     int current_step_num_container_from_mpc_;
+
+    int total_step_num_container_to_mpc_;
 
     Eigen::MatrixXd ref_com_;
     Eigen::MatrixXd ref_com_mpc_;
@@ -1717,6 +1716,10 @@ public:
     Eigen::VectorQd torque_wbd_;
     Eigen::VectorQd torque_wbd_container_to_fast_;
     Eigen::VectorQd torque_wbd_fast_;
+
+    Eigen::VectorQd torque_sum_;
+    Eigen::VectorQd torque_sum_lpf_;
+    Eigen::VectorQd torque_pd_;
     
     Eigen::VectorQd torque_desired_prev_;
     Eigen::VectorQd torque_desired_prev_container_to_fast_;
@@ -1765,8 +1768,9 @@ public:
 
 private:    
     unsigned int walking_tick_ = 0;
-    unsigned int scenario_tick_ = 0;
+    unsigned int mpc_tick_ = 0;
     unsigned int scenario_num_  = 0;
+    unsigned int scenario_end_num_  = 2;
     unsigned int walking_tick_mpc_ = 0;
     unsigned int walking_tick_container_to_mpc_ = 0;
     unsigned int initial_tick_ = 0;
