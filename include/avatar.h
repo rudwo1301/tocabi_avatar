@@ -1123,6 +1123,8 @@ public:
     Eigen::VectorQd ref_q_;
     Eigen::VectorQd Kp;
     Eigen::VectorQd Kd;
+    Eigen::VectorQd Kp_mj_;
+    Eigen::VectorQd Kd_mj_;
     Eigen::VectorQd desired_q_not_compensated_;
     
     Eigen::VectorQd q_prev_MJ_;
@@ -1402,9 +1404,11 @@ public:
     int    param_scenario_;
     bool   param_stepping_stone_;
     bool   param_loco_manipulation_;
+    bool   param_disturbance_walking_;
 
     double zmp_x_max = 0.15;
     double zmp_x_min = 0.09;
+    //double zmp_x_min = 0.05;
     double zmp_x_max_foot_width_ = 0.17;
     double zmp_x_min_foot_width_ = 0.11;
     //double zmp_y_max = 0.10;
