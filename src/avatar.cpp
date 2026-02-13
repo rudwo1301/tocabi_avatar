@@ -502,7 +502,7 @@ void AvatarController::computeSlow()
             }
 
             CAM_upper_init_q_(13) = 0.15;
-            
+
             if(!param_stepping_stone_)
             {
                 CAM_upper_init_q_(15) = + 15.0 * DEG2RAD; // Left Shoulder Yaw joint // 17 deg
@@ -8007,7 +8007,7 @@ void AvatarController::onestepVrpZ(unsigned int current_step_number, double t_to
 {
     temp_pz.setZero(t_total_zmp);
 
-    if(param_disturbance_walking_)
+    if(param_disturbance_walking_ && scenario_num_)
     {
         height_diff_vec_(0) = 0.05;
     }
@@ -8086,9 +8086,12 @@ void AvatarController::onestepVrpZ(unsigned int current_step_number, double t_to
 
     temp_pz.setConstant(zc_mj_ + height_diff);
 
-    //temp_pz.segment(                    0, t_dsp1_                        ).setConstant(zc_mj_ + 0.5*(height_diff_prev + height_diff     ));
-    //temp_pz.segment(              t_dsp1_, t_total_zmp - t_dsp1_ - t_dsp2_).setConstant(zc_mj_ + 0.5*(height_diff      + height_diff     ));
-    //temp_pz.segment(t_total_zmp - t_dsp2_, t_dsp2_                        ).setConstant(zc_mj_ + 0.5*(height_diff      + height_diff_next));
+    if(param_disturbance_walking_ && scenario_num_)
+    {
+        temp_pz.segment(                    0, t_dsp1_                        ).setConstant(zc_mj_ + 0.5*(height_diff_prev + height_diff     ));
+        temp_pz.segment(              t_dsp1_, t_total_zmp - t_dsp1_ - t_dsp2_).setConstant(zc_mj_ + 0.5*(height_diff      + height_diff     ));
+        temp_pz.segment(t_total_zmp - t_dsp2_, t_dsp2_                        ).setConstant(zc_mj_ + 0.5*(height_diff      + height_diff_next));
+    }
 }
 
 void AvatarController::getFootTrajectory()
