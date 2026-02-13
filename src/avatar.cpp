@@ -631,7 +631,8 @@ void AvatarController::computeSlow()
                     double calc_13_1 = DyrosMath::cubic(walking_tick_, t_temp_ - 8.0*hz_, t_temp_ - 7.0*hz_, Initial_ref_q_(13), 0.40, 0.0, 0.0);
                     double calc_13_2 = DyrosMath::cubic(walking_tick_, t_temp_ - 2.0*hz_, t_temp_ - 1.0*hz_, 0.40, 0.15, 0.0, 0.0);
                     
-                    if(scenario_num_ || param_stepping_stone_)
+                    //if(scenario_num_ || param_stepping_stone_)
+                    if(scenario_num_)
                     {
                         if(param_loco_manipulation_)
                         {
@@ -6676,13 +6677,9 @@ void AvatarController::getRobotState()
     dcm_measured_(1) = com_support_current_(1) + b_*com_float_current_dot_LPF(1);
     dcm_measured_(2) = com_support_current_(2) + b_*com_float_current_dot_LPF(2);
 
-    dcm_measured_ = temp_rot*com_support_current_ + b_ * com_float_current_dot_LPF;
-
     com_measured_(0) = com_support_current_(0);
     com_measured_(1) = com_support_current_(1);
     com_measured_(2) = com_support_current_(2);
-
-    com_measured_ = temp_rot*com_support_current_;
 
     com_dot_measured_(0) = com_float_current_dot_LPF(0);
     com_dot_measured_(1) = com_float_current_dot_LPF(1);
@@ -7036,24 +7033,24 @@ void AvatarController::calculateFootStepTotal_ec2()
 
     if(param_stepping_stone_)
     {
-        foot_step_temp( 2, 0) = foot_step_temp( 1, 0) + 0.195; foot_step_temp( 2, 2) = 0.00; height_diff_vec_( 2) = 0.00;
-        foot_step_temp( 3, 0) = foot_step_temp( 2, 0) + 0.195; foot_step_temp( 3, 2) = 0.10; height_diff_vec_( 3) = 0.00;
-        foot_step_temp( 4, 0) = foot_step_temp( 3, 0) + 0.195; foot_step_temp( 4, 2) = 0.10; height_diff_vec_( 4) = 0.10;
-        foot_step_temp( 5, 0) = foot_step_temp( 4, 0) - 0.095; foot_step_temp( 5, 2) = 0.10; height_diff_vec_( 5) = 0.10;
-        foot_step_temp( 6, 0) = foot_step_temp( 5, 0) + 0.195; foot_step_temp( 6, 2) = 0.10; height_diff_vec_( 6) = 0.00;
-        foot_step_temp( 7, 0) = foot_step_temp( 6, 0) + 0.195; foot_step_temp( 7, 2) = 0.20; height_diff_vec_( 7) = 0.00;
-        foot_step_temp( 8, 0) = foot_step_temp( 7, 0) + 0.195; foot_step_temp( 8, 2) = 0.10; height_diff_vec_( 8) = 0.10;
-        foot_step_temp( 9, 0) = foot_step_temp( 8, 0) + 0.095; foot_step_temp( 9, 2) = 0.20; height_diff_vec_( 9) = 0.10;    
-        foot_step_temp(10, 0) = foot_step_temp( 9, 0) + 0.195; foot_step_temp(10, 2) = 0.10; height_diff_vec_(10) = 0.10;
-        foot_step_temp(11, 0) = foot_step_temp(10, 0) + 0.195; foot_step_temp(11, 2) = 0.10; height_diff_vec_(11) = 0.10;
-        foot_step_temp(12, 0) = foot_step_temp(11, 0) + 0.195; foot_step_temp(12, 2) = 0.00; height_diff_vec_(12) = 0.10;
-        foot_step_temp(13, 0) = foot_step_temp(12, 0) - 0.105; foot_step_temp(13, 2) = 0.10; height_diff_vec_(13) = 0.10;
-        foot_step_temp(14, 0) = foot_step_temp(13, 0) + 0.195; foot_step_temp(14, 2) = 0.00; height_diff_vec_(14) = 0.10;
-        foot_step_temp(15, 0) = foot_step_temp(14, 0) + 0.195; foot_step_temp(15, 2) = 0.00; height_diff_vec_(15) = 0.10;
-        foot_step_temp(16, 0) = foot_step_temp(15, 0) + 0.195; foot_step_temp(16, 2) = 0.00; height_diff_vec_(16) = 0.00;
-        foot_step_temp(17, 0) = foot_step_temp(16, 0) + 0.195; foot_step_temp(17, 2) = 0.00; height_diff_vec_(17) = 0.00;
-        foot_step_temp(18, 0) = foot_step_temp(17, 0) + 0.000; foot_step_temp(18, 2) = 0.00; height_diff_vec_(18) = 0.00;
-        foot_step_temp(19, 0) = foot_step_temp(18, 0) + 0.000; foot_step_temp(19, 2) = 0.00; height_diff_vec_(19) = 0.00;
+        foot_step_temp( 2, 0) = foot_step_temp( 1, 0) + 0.195; foot_step_temp( 2, 2) = 0.00;
+        foot_step_temp( 3, 0) = foot_step_temp( 2, 0) + 0.195; foot_step_temp( 3, 2) = 0.10;
+        foot_step_temp( 4, 0) = foot_step_temp( 3, 0) + 0.195; foot_step_temp( 4, 2) = 0.10;
+        foot_step_temp( 5, 0) = foot_step_temp( 4, 0) - 0.095; foot_step_temp( 5, 2) = 0.10;
+        foot_step_temp( 6, 0) = foot_step_temp( 5, 0) + 0.195; foot_step_temp( 6, 2) = 0.10;
+        foot_step_temp( 7, 0) = foot_step_temp( 6, 0) + 0.195; foot_step_temp( 7, 2) = 0.20;
+        foot_step_temp( 8, 0) = foot_step_temp( 7, 0) + 0.195; foot_step_temp( 8, 2) = 0.10;
+        foot_step_temp( 9, 0) = foot_step_temp( 8, 0) + 0.095; foot_step_temp( 9, 2) = 0.20;
+        foot_step_temp(10, 0) = foot_step_temp( 9, 0) + 0.195; foot_step_temp(10, 2) = 0.10;
+        foot_step_temp(11, 0) = foot_step_temp(10, 0) + 0.195; foot_step_temp(11, 2) = 0.10;
+        foot_step_temp(12, 0) = foot_step_temp(11, 0) + 0.195; foot_step_temp(12, 2) = 0.00;
+        foot_step_temp(13, 0) = foot_step_temp(12, 0) - 0.105; foot_step_temp(13, 2) = 0.10;
+        foot_step_temp(14, 0) = foot_step_temp(13, 0) + 0.195; foot_step_temp(14, 2) = 0.00;
+        foot_step_temp(15, 0) = foot_step_temp(14, 0) + 0.195; foot_step_temp(15, 2) = 0.00;
+        foot_step_temp(16, 0) = foot_step_temp(15, 0) + 0.195; foot_step_temp(16, 2) = 0.00;
+        foot_step_temp(17, 0) = foot_step_temp(16, 0) + 0.195; foot_step_temp(17, 2) = 0.00;
+        foot_step_temp(18, 0) = foot_step_temp(17, 0) + 0.000; foot_step_temp(18, 2) = 0.00;
+        foot_step_temp(19, 0) = foot_step_temp(18, 0) + 0.000; foot_step_temp(19, 2) = 0.00;
 
         foot_step_ = foot_step_temp;
         cout << "stepping stone foot step rows: " << foot_step_.rows() << endl;
@@ -8012,6 +8009,62 @@ void AvatarController::onestepVrpZ(unsigned int current_step_number, double t_to
         height_diff_vec_(0) = 0.05;
     }
 
+    if(param_stepping_stone_)
+    {
+        if(current_step_num_ == 4)
+        {
+            height_diff_vec_(4) = 0.10;
+        }
+        height_diff_vec_(5) = 0.10;
+        height_diff_vec_(6) = 0.10;
+
+        if(current_step_num_ == 8)
+        {
+            height_diff_vec_(8) = 0.10;
+            height_diff_vec_(9) = 0.10;
+        }
+
+        if(current_step_num_ == 9)
+        {
+            height_diff_vec_(9) = 0.00;
+        }
+
+        if(current_step_num_ == 10)
+        {
+            height_diff_vec_(10) = 0.10;
+            height_diff_vec_(11) = 0.10;
+        }
+
+        if(current_step_num_ == 11)
+        {
+            height_diff_vec_(11) = 0.00;
+        }
+
+        height_diff_vec_(12) = 0.10;
+        
+        if(current_step_num_ == 12)
+        {
+            height_diff_vec_(13) = 0.10;
+        }
+
+        if(current_step_num_ == 13)
+        {
+            height_diff_vec_(13) = 0.00;
+        }
+
+        if(current_step_num_ == 14)
+        {
+            height_diff_vec_(14) = 0.10;
+            height_diff_vec_(15) = 0.10;
+        }
+        
+        if(current_step_num_ == 15)
+        {
+            height_diff_vec_(15) = 0.00;
+        }
+
+    }
+
     double height_diff, height_diff_prev, height_diff_next;
     
     for(int i = 0; i < total_step_num_; i++)
@@ -8030,9 +8083,9 @@ void AvatarController::onestepVrpZ(unsigned int current_step_number, double t_to
 
     temp_pz.setConstant(zc_mj_ + height_diff);
 
-    temp_pz.segment(                    0, t_dsp1_                        ).setConstant(zc_mj_ + 0.5*(height_diff_prev + height_diff     ));
-    temp_pz.segment(              t_dsp1_, t_total_zmp - t_dsp1_ - t_dsp2_).setConstant(zc_mj_ + 0.5*(height_diff      + height_diff     ));
-    temp_pz.segment(t_total_zmp - t_dsp2_, t_dsp2_                        ).setConstant(zc_mj_ + 0.5*(height_diff      + height_diff_next));
+    //temp_pz.segment(                    0, t_dsp1_                        ).setConstant(zc_mj_ + 0.5*(height_diff_prev + height_diff     ));
+    //temp_pz.segment(              t_dsp1_, t_total_zmp - t_dsp1_ - t_dsp2_).setConstant(zc_mj_ + 0.5*(height_diff      + height_diff     ));
+    //temp_pz.segment(t_total_zmp - t_dsp2_, t_dsp2_                        ).setConstant(zc_mj_ + 0.5*(height_diff      + height_diff_next));
 }
 
 void AvatarController::getFootTrajectory()
@@ -11472,7 +11525,7 @@ void AvatarController::parameterSetting()
     foot_height_ = 0.055;
     //foot_height_ = 0.075;
 
-    t_temp_ = 4.0 * hz_ + 10.0 * hz_*(bool)(scenario_num_) + 10.0 * hz_*(bool)(param_stepping_stone_);
+    t_temp_ = 4.0 * hz_ + 10.0 * hz_*(bool)(scenario_num_);
     t_last_ = t_total_ + t_temp_;
     t_start_ = t_temp_ + 1;
 
