@@ -2,40 +2,40 @@
 #include <fstream>
 using namespace TOCABI;
 
-ofstream e_mpc_time_graph     ("/home/dyros/data/econom2/e_mpc_time_graph.txt");
-ofstream e_mpc_time_graph3    ("/home/dyros/data/econom2/e_mpc_time_graph3.txt");
-ofstream e_mpc_time_graph4    ("/home/dyros/data/econom2/e_mpc_time_graph4.txt");
-ofstream e_main_time_graph    ("/home/dyros/data/econom2/e_main_time_graph.txt");
-ofstream e_mpc_planner_data   ("/home/dyros/data/econom2/e_mpc_planner_data.txt");
-ofstream e_mpc_stabilizer_data("/home/dyros/data/econom2/e_mpc_stabilizer_data.txt");
-ofstream e_tmp_graph1         ("/home/dyros/data/econom2/e_tmp_graph1.txt");
-ofstream e_tmp_graph2         ("/home/dyros/data/econom2/e_tmp_graph2.txt");
-ofstream e_tmp_graph3         ("/home/dyros/data/econom2/e_tmp_graph3.txt");
-ofstream e_tmp_graph4         ("/home/dyros/data/econom2/e_tmp_graph4.txt");
-ofstream e_tmp_graph5         ("/home/dyros/data/econom2/e_tmp_graph5.txt");
-ofstream e_tmp_graph6         ("/home/dyros/data/econom2/e_tmp_graph6.txt");
-ofstream e_tmp_graph7         ("/home/dyros/data/econom2/e_tmp_graph7.txt");
-ofstream e_tmp_graph8         ("/home/dyros/data/econom2/e_tmp_graph8.txt");
-ofstream e_tmp_graph9         ("/home/dyros/data/econom2/e_tmp_graph9.txt");
-ofstream e_tmp_graph10        ("/home/dyros/data/econom2/e_tmp_graph10.txt");
-ofstream e_tmp_graph11        ("/home/dyros/data/econom2/e_tmp_graph11.txt");
-ofstream e_tmp_graph12        ("/home/dyros/data/econom2/e_tmp_graph12.txt");
-ofstream e_tmp_graph13        ("/home/dyros/data/econom2/e_tmp_graph13.txt");
-ofstream e_tmp_graph14        ("/home/dyros/data/econom2/e_tmp_graph14.txt");
-ofstream e_tmp_graph15        ("/home/dyros/data/econom2/e_tmp_graph15.txt");
-ofstream e_tmp_graph16        ("/home/dyros/data/econom2/e_tmp_graph16.txt");
-ofstream e_tmp_graph17        ("/home/dyros/data/econom2/e_tmp_graph17.txt");
-ofstream e_tmp_graph18        ("/home/dyros/data/econom2/e_tmp_graph18.txt");
-ofstream e_tmp_graph19        ("/home/dyros/data/econom2/e_tmp_graph19.txt");
-ofstream e_tmp_graph20        ("/home/dyros/data/econom2/e_tmp_graph20.txt");
-ofstream e_tmp_graph21        ("/home/dyros/data/econom2/e_tmp_graph21.txt");
-ofstream e_tmp_graph22        ("/home/dyros/data/econom2/e_tmp_graph22.txt");
-ofstream e_tmp_graph23        ("/home/dyros/data/econom2/e_tmp_graph23.txt");
-ofstream e_tmp_graph24        ("/home/dyros/data/econom2/e_tmp_graph24.txt");
-ofstream e_tmp_graph25        ("/home/dyros/data/econom2/e_tmp_graph25.txt");
-ofstream e_tmp_graph26        ("/home/dyros/data/econom2/e_tmp_graph26.txt");
-ofstream e_tmp_graph27        ("/home/dyros/data/econom2/e_tmp_graph27.txt");
-ofstream e_tmp_graph28        ("/home/dyros/data/econom2/e_tmp_graph28.txt");
+ofstream e_mpc_time_graph;
+ofstream e_mpc_time_graph3;
+ofstream e_mpc_time_graph4;
+ofstream e_main_time_graph;
+ofstream e_mpc_planner_data;
+ofstream e_mpc_stabilizer_data;
+ofstream e_tmp_graph1;
+ofstream e_tmp_graph2;
+ofstream e_tmp_graph3;
+ofstream e_tmp_graph4;
+ofstream e_tmp_graph5;
+ofstream e_tmp_graph6;
+ofstream e_tmp_graph7;
+ofstream e_tmp_graph8;
+ofstream e_tmp_graph9;
+ofstream e_tmp_graph10;
+ofstream e_tmp_graph11;
+ofstream e_tmp_graph12;
+ofstream e_tmp_graph13;
+ofstream e_tmp_graph14;
+ofstream e_tmp_graph15;
+ofstream e_tmp_graph16;
+ofstream e_tmp_graph17;
+ofstream e_tmp_graph18;
+ofstream e_tmp_graph19;
+ofstream e_tmp_graph20;
+ofstream e_tmp_graph21;
+ofstream e_tmp_graph22;
+ofstream e_tmp_graph23;
+ofstream e_tmp_graph24;
+ofstream e_tmp_graph25;
+ofstream e_tmp_graph26;
+ofstream e_tmp_graph27;
+ofstream e_tmp_graph28;
 
 AvatarController::AvatarController(RobotData &rd) : rd_(rd)
 {
@@ -84,18 +84,21 @@ AvatarController::AvatarController(RobotData &rd) : rd_(rd)
     bool urdfmode = false;
     std::string urdf_path, desc_package_path;
     ros::param::get("/tocabi_controller/urdf_path", desc_package_path);
-    ros::param::get("/tocabi_controller/sim_mode", param_sim_mode_);
-    ros::param::get("/econom2_ext_time",param_ext_force_time_);
-    ros::param::get("/econom2_ext_step",param_ext_force_step_);
-    ros::param::get("/econom2_extforce",param_ext_force_);
-    ros::param::get("/econom2_exttheta",param_ext_theta_);
+    ros::param::get("/tocabi_controller/sim_mode",  param_sim_mode_);
+    ros::param::get("/econom2_ext_time",            param_ext_force_time_);
+    ros::param::get("/econom2_ext_step",            param_ext_force_step_);
+    ros::param::get("/econom2_extforce",            param_ext_force_);
+    ros::param::get("/econom2_exttheta",            param_ext_theta_);
 
-    ros::param::get("/econom2_stepping_stone",param_stepping_stone_);
-    ros::param::get("/econom2_loco_manipulation",param_loco_manipulation_);
-    ros::param::get("/econom2_disturbance_walking",param_disturbance_walking_);
+    ros::param::get("/econom2_stepping_stone",      param_stepping_stone_);
+    ros::param::get("/econom2_loco_manipulation",   param_loco_manipulation_);
+    ros::param::get("/econom2_disturbance_walking", param_disturbance_walking_);
     
-    //param_loco_manipulation_ = true;
-    param_stepping_stone_ = true;
+    if(!param_sim_mode_)
+    {
+        //param_loco_manipulation_ = true;
+        param_stepping_stone_ = true;
+    }
 
     RigidBodyDynamics::Addons::URDFReadFromFile(desc_package_path.c_str(), &model_d_, true, false);
     RigidBodyDynamics::Addons::URDFReadFromFile(desc_package_path.c_str(), &model_c_, true, false);
@@ -107,6 +110,48 @@ AvatarController::AvatarController(RobotData &rd) : rd_(rd)
     first_loop_hqpik_ = true;
     first_loop_hqpik2_ = true;
     first_loop_qp_retargeting_ = true;
+
+    ///////////////////////////////////////////////////////////////////////////////////////////////////////
+    std::string file_path;
+    if(param_sim_mode_)
+    { file_path = "/home/econom2-20/data/"; }
+    else
+    { file_path = "/home/dyros/data/econom2/"; }
+
+    e_mpc_time_graph     .open(file_path + "e_mpc_time_graph.txt");
+    e_mpc_time_graph3    .open(file_path + "e_mpc_time_graph3.txt");
+    e_mpc_time_graph4    .open(file_path + "e_mpc_time_graph4.txt");
+    e_main_time_graph    .open(file_path + "e_main_time_graph.txt");
+    e_mpc_planner_data   .open(file_path + "e_mpc_planner_data.txt");
+    e_mpc_stabilizer_data.open(file_path + "e_mpc_stabilizer_data.txt");
+    e_tmp_graph1         .open(file_path + "e_tmp_graph1.txt");
+    e_tmp_graph2         .open(file_path + "e_tmp_graph2.txt");
+    e_tmp_graph3         .open(file_path + "e_tmp_graph3.txt");
+    e_tmp_graph4         .open(file_path + "e_tmp_graph4.txt");
+    e_tmp_graph5         .open(file_path + "e_tmp_graph5.txt");
+    e_tmp_graph6         .open(file_path + "e_tmp_graph6.txt");
+    e_tmp_graph7         .open(file_path + "e_tmp_graph7.txt");
+    e_tmp_graph8         .open(file_path + "e_tmp_graph8.txt");
+    e_tmp_graph9         .open(file_path + "e_tmp_graph9.txt");
+    e_tmp_graph10        .open(file_path + "e_tmp_graph10.txt");
+    e_tmp_graph11        .open(file_path + "e_tmp_graph11.txt");
+    e_tmp_graph12        .open(file_path + "e_tmp_graph12.txt");
+    e_tmp_graph13        .open(file_path + "e_tmp_graph13.txt");
+    e_tmp_graph14        .open(file_path + "e_tmp_graph14.txt");
+    e_tmp_graph15        .open(file_path + "e_tmp_graph15.txt");
+    e_tmp_graph16        .open(file_path + "e_tmp_graph16.txt");
+    e_tmp_graph17        .open(file_path + "e_tmp_graph17.txt");
+    e_tmp_graph18        .open(file_path + "e_tmp_graph18.txt");
+    e_tmp_graph19        .open(file_path + "e_tmp_graph19.txt");
+    e_tmp_graph20        .open(file_path + "e_tmp_graph20.txt");
+    e_tmp_graph21        .open(file_path + "e_tmp_graph21.txt");
+    e_tmp_graph22        .open(file_path + "e_tmp_graph22.txt");
+    e_tmp_graph23        .open(file_path + "e_tmp_graph23.txt");
+    e_tmp_graph24        .open(file_path + "e_tmp_graph24.txt");
+    e_tmp_graph25        .open(file_path + "e_tmp_graph25.txt");
+    e_tmp_graph26        .open(file_path + "e_tmp_graph26.txt");
+    e_tmp_graph27        .open(file_path + "e_tmp_graph27.txt");
+    e_tmp_graph28        .open(file_path + "e_tmp_graph28.txt");
 }
 
 void AvatarController::setGains()
@@ -630,6 +675,13 @@ void AvatarController::computeSlow()
                 getPelvTrajectory(); 
                 supportToFloatPattern();
                 computeIkControl_MJ(pelv_trajectory_float_, lfoot_trajectory_float_, rfoot_trajectory_float_, q_des_);
+                
+                double temp1 = DyrosMath::cubic(walking_tick_, t_start_ + 0.5*t_total_, t_start_ + 0.6*t_total_, 0.0, 1.0 - foot_step_(current_step_num_, 6), 0.0, 0.0);
+                double temp2 = DyrosMath::cubic(walking_tick_, t_start_ + 0.6*t_total_, t_start_ + 0.7*t_total_, 1.0 - foot_step_(current_step_num_, 6), 0.0, 0.0, 0.0);
+
+                //hip compensation
+                if(!param_sim_mode_)
+                { q_des_(7) += 0.003*min(temp1, temp2); }
 
                 if(walking_tick_ < t_temp_ - 1.0*hz_)
                 {
@@ -641,14 +693,14 @@ void AvatarController::computeSlow()
                     {
                         if(param_loco_manipulation_)
                         {
-                            CAM_upper_init_q_(13) = min(calc_13_1, calc_13_2);
+                            //CAM_upper_init_q_(13) = min(calc_13_1, calc_13_2);
                         }
 
                         CAM_upper_init_q_(15) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(15),  0.00, 0.0, 0.0);
                         CAM_upper_init_q_(25) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(25), -0.00, 0.0, 0.0);
 
-                        CAM_upper_init_q_(16) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(16), -0.50, 0.0, 0.0);
-                        CAM_upper_init_q_(26) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(26),  0.50, 0.0, 0.0);
+                        CAM_upper_init_q_(16) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(16), -0.70, 0.0, 0.0);
+                        CAM_upper_init_q_(26) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(26),  0.70, 0.0, 0.0);
 
                         CAM_upper_init_q_(17) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(17),  1.40, 0.0, 0.0);
                         CAM_upper_init_q_(27) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(27), -1.40, 0.0, 0.0);
@@ -6359,7 +6411,7 @@ double AvatarController::bandBlock(double value, double max, double min)
 
 void AvatarController::printOutTextFile()
 {
-    
+
 }
 
 //////////////////////////////MJ's Functions////////////////////
@@ -9329,13 +9381,13 @@ void AvatarController::getComTrajectory_mpc()
 
     MPC_Stabilizer_interpol_ ++;
     
-    vrp_desired_(0) = MPC_Stabilizer_state_main_(2);
-    vrp_desired_(1) = MPC_Stabilizer_state_main_(5);
-    vrp_desired_(2) = MPC_Stabilizer_state_main_(8);
+    //vrp_desired_(0) = MPC_Stabilizer_state_main_(2);
+    //vrp_desired_(1) = MPC_Stabilizer_state_main_(5);
+    //vrp_desired_(2) = MPC_Stabilizer_state_main_(8);
 
-    //vrp_desired_(0) = MPC_Stabilizer_state_main_i_(2);
-    //vrp_desired_(1) = MPC_Stabilizer_state_main_i_(5);
-    //vrp_desired_(2) = MPC_Stabilizer_state_main_i_(8);
+    vrp_desired_(0) = MPC_Stabilizer_state_main_i_(2);
+    vrp_desired_(1) = MPC_Stabilizer_state_main_i_(5);
+    vrp_desired_(2) = MPC_Stabilizer_state_main_i_(8);
 
     step_enable_bool_main_ = step_enable_bool_one_tick_main_;
 
@@ -9802,8 +9854,8 @@ void AvatarController::IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, d
     double wpvx, wpvy, wpvz;
     double wdvx, wdvy, wdvz;
 
-    //wpvx = 1e+2; wpvy = 1e+6; wpvz = 1e+2;
-    wpvx = 1e+2; wpvy = 1e+6; wpvz = 1e+4;
+    wpvx = 1e+2; wpvy = 1e+6; wpvz = 1e+2;
+    //wpvx = 1e+2; wpvy = 1e+6; wpvz = 1e+4;
     wdvx = 1e+0; wdvy = 1e+0; wdvz = 1e+0;
 
     int mpc_tick = walking_tick_mpc_ - com_start_tick_mpc_;
@@ -10043,7 +10095,7 @@ void AvatarController::IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, d
         int step_time_adj_calc = max(MPC_Stabilizer_time_adj_tick_x_mpc_, MPC_Stabilizer_time_adj_tick_y_mpc_);
         bool nnext_step_prev_bool = (bool)(mpc_tick + mpc_synchro_hz*(i + 2 + step_time_adj_calc) > (2*t_total_const_ - t_dsp2_));
 
-        zmp_time_calc_x_(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + 1 + (1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),0) + 0.03 - 0.02*(bool)(scenario_num_);
+        zmp_time_calc_x_(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + 1 + (1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),0) + 0.04 - 0.03*(bool)(scenario_num_);
         zmp_time_calc_y_(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + 1 + (1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),1);
 
         if(i < N_step)
@@ -10650,17 +10702,17 @@ void AvatarController::IS_FIPM_3D_DCM_Stabililzer_MPC(double mpc_freq, double pr
                 next_step_prev_bool       = (bool)(mpc_tick + MPC_synchro_hz_*(i + 1) > ((1 - (bool)(current_step_num_mpc_))*t_temp_ + (j + 1)*t_total_mpc_ - t_dsp2_const_));
             }
 
-            if((walking_tick_mpc_ > t_temp_ - (t_dsp2_const_ + step_enable_fix_time_pre_*hz_)) && (next_step_start_prev_tick < N_stab_mpc))
+            if((walking_tick_mpc_ > t_temp_ - (t_dsp2_const_ + step_enable_fix_time_pre_*hz_)) && (next_step_start_prev_tick < N_stab_mpc) && (!param_stepping_stone_))
             {
-                //Sf1_stab_mpc_(i,0) = step_enable_bool_mpc_* next_step_prev_bool*(zmp_max_y_mpc_(i) - zmp_max_y_mpc_(int(t_dsp1_const_/MPC_synchro_hz_)))/(MPC_Stabilizer_delf_mpc_y_(0));
-                //if(walking_tick_mpc_ < t_temp_)
-                //{
-                //    Sf1_stab_mpc_(i,0) = step_enable_bool_mpc_* next_step_prev_bool*(zmp_max_y_mpc_(i) - zmp_max_y_mpc_(int(t_dsp1_const_/MPC_synchro_hz_) + step_time_adj_candidate_num_))/(MPC_Stabilizer_delf_mpc_y_(0));
-                //}
-                //zmp_max_x_mpc_(i)  = step_enable_bool_mpc_*(next_step_prev_bool* zmp_max_x_mpc_(max(0, next_step_start_prev_tick - 2)) + (1 - next_step_prev_bool)*zmp_max_x_mpc_(i)) + (1 - step_enable_bool_mpc_)*zmp_max_x_mpc_(i);
-                //zmp_min_x_mpc_(i)  = step_enable_bool_mpc_*(next_step_prev_bool* zmp_min_x_mpc_(max(0, next_step_start_prev_tick - 2)) + (1 - next_step_prev_bool)*zmp_min_x_mpc_(i)) + (1 - step_enable_bool_mpc_)*zmp_min_x_mpc_(i);
-                //zmp_max_y_mpc_(i)  = step_enable_bool_mpc_*(next_step_prev_bool* zmp_max_y_mpc_(max(0, next_step_start_prev_tick - 2)) + (1 - next_step_prev_bool)*zmp_max_y_mpc_(i)) + (1 - step_enable_bool_mpc_)*zmp_max_y_mpc_(i);
-                //zmp_min_y_mpc_(i)  = step_enable_bool_mpc_*(next_step_prev_bool* zmp_min_y_mpc_(max(0, next_step_start_prev_tick - 2)) + (1 - next_step_prev_bool)*zmp_min_y_mpc_(i)) + (1 - step_enable_bool_mpc_)*zmp_min_y_mpc_(i);
+                Sf1_stab_mpc_(i,0) = step_enable_bool_mpc_* next_step_prev_bool*(zmp_max_y_mpc_(i) - zmp_max_y_mpc_(int(t_dsp1_const_/MPC_synchro_hz_)))/(MPC_Stabilizer_delf_mpc_y_(0));
+                if(walking_tick_mpc_ < t_temp_)
+                {
+                    Sf1_stab_mpc_(i,0) = step_enable_bool_mpc_* next_step_prev_bool*(zmp_max_y_mpc_(i) - zmp_max_y_mpc_(int(t_dsp1_const_/MPC_synchro_hz_) + step_time_adj_candidate_num_))/(MPC_Stabilizer_delf_mpc_y_(0));
+                }
+                zmp_max_x_mpc_(i)  = step_enable_bool_mpc_*(next_step_prev_bool* zmp_max_x_mpc_(max(0, next_step_start_prev_tick - 2)) + (1 - next_step_prev_bool)*zmp_max_x_mpc_(i)) + (1 - step_enable_bool_mpc_)*zmp_max_x_mpc_(i);
+                zmp_min_x_mpc_(i)  = step_enable_bool_mpc_*(next_step_prev_bool* zmp_min_x_mpc_(max(0, next_step_start_prev_tick - 2)) + (1 - next_step_prev_bool)*zmp_min_x_mpc_(i)) + (1 - step_enable_bool_mpc_)*zmp_min_x_mpc_(i);
+                zmp_max_y_mpc_(i)  = step_enable_bool_mpc_*(next_step_prev_bool* zmp_max_y_mpc_(max(0, next_step_start_prev_tick - 2)) + (1 - next_step_prev_bool)*zmp_max_y_mpc_(i)) + (1 - step_enable_bool_mpc_)*zmp_max_y_mpc_(i);
+                zmp_min_y_mpc_(i)  = step_enable_bool_mpc_*(next_step_prev_bool* zmp_min_y_mpc_(max(0, next_step_start_prev_tick - 2)) + (1 - next_step_prev_bool)*zmp_min_y_mpc_(i)) + (1 - step_enable_bool_mpc_)*zmp_min_y_mpc_(i);
             }
         }
     }
@@ -11563,7 +11615,8 @@ void AvatarController::parameterSetting()
 {       
     target_x_ = 0.00;
     if(scenario_num_ == 0 && param_loco_manipulation_ == 1)
-    { target_x_ = 0.75; }
+    { target_x_ = 0.00; }
+    //{ target_x_ = 0.75; }
     target_y_ = 0.0;
     if(scenario_num_ == 1)
     { target_y_ = 0.00; }

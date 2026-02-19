@@ -40,6 +40,7 @@ public:
     Eigen::VectorQd getControl();
     std::ofstream calibration_log_file_ofstream_[4];
     std::ifstream calibration_log_file_ifstream_[4];
+
     //void taskCommandToCC(TaskCommand tc_);
 
     void computeSlow();
