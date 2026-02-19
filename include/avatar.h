@@ -1236,6 +1236,11 @@ public:
     Eigen::Isometry3d rfoot_support_current_calc_;
     Eigen::Vector6d   lfoot_support_current_dot_;
     Eigen::Vector6d   rfoot_support_current_dot_;
+    Eigen::Isometry3d lfoot_support_current_container_to_mpc_;
+    Eigen::Isometry3d rfoot_support_current_container_to_mpc_;
+    Eigen::Isometry3d lfoot_support_current_mpc_;
+    Eigen::Isometry3d rfoot_support_current_mpc_;
+
 
     Eigen::Isometry3d lfoot_support_init_;
     Eigen::Isometry3d rfoot_support_init_;
