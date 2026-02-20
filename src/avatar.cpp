@@ -7848,10 +7848,15 @@ void AvatarController::zmpGenerator(const unsigned int norm_size, const unsigned
 
     unsigned int index = 0;
     double t_total_zmp = t_total_const_;
+    if(walking_tick_ == 0)
+    {
+        com_real_robot_scenario_ = com_support_current_(0) - 0.02;
+    }
 
     if (current_step_num_ == 0)  
     {
-        ref_zmp_.block(0, 0, 1.0*hz_, 1).setConstant(com_support_init_(0));
+        //ref_zmp_.block(0, 0, 1.0*hz_, 1).setConstant(com_support_init_(0));
+        ref_zmp_.block(0, 0, 1.0*hz_, 1).setConstant(com_real_robot_scenario_);
         ref_zmp_.block(0, 1, 1.0*hz_, 1).setConstant(com_support_init_(1));
         
         ref_vrp_.block(0, 0, 1.0*hz_, 2) = ref_zmp_.block(0, 0, 1.0*hz_, 2);
@@ -7866,7 +7871,8 @@ void AvatarController::zmpGenerator(const unsigned int norm_size, const unsigned
         {
             double del_x = i - 1.0 * hz_;
 
-            ref_zmp_(i, 0) = com_support_init_(0) - del_x * com_support_init_(0) / (1.0 * hz_);
+            //ref_zmp_(i, 0) = com_support_init_(0) - del_x * com_support_init_(0) / (1.0 * hz_);
+            ref_zmp_(i, 0) = com_real_robot_scenario_ - del_x * com_real_robot_scenario_ / (1.0 * hz_);
             ref_zmp_(i, 1) = com_support_init_(1);
             
             ref_vrp_(i, 0) = ref_zmp_(i, 0);
@@ -9225,7 +9231,6 @@ void AvatarController::getComTrajectory_mpc()
         MPC_Stabilizer_state_main_diff_.setZero(9);
         MPC_Stabilizer_state_main_i_.setZero(9);
         
-
         MPC_Planner_state_mpc_(0) = com_support_current_(0); 
         MPC_Planner_state_mpc_(2) = com_support_current_(0); 
         MPC_Planner_state_mpc_(3) = yi_mj_;
@@ -10141,7 +10146,8 @@ void AvatarController::IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, d
         int step_time_adj_calc = max(MPC_Stabilizer_time_adj_tick_x_mpc_, MPC_Stabilizer_time_adj_tick_y_mpc_);
         bool nnext_step_prev_bool = (bool)(mpc_tick + mpc_synchro_hz*(i + 2 + step_time_adj_calc) > (2*t_total_const_ - t_dsp2_));
 
-        zmp_time_calc_x_(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + 1 + (1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),0) + 0.04 - 0.03*(bool)(scenario_num_);
+        //zmp_time_calc_x_(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + 1 + (1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),0) + 0.04 - 0.03*(bool)(scenario_num_);
+        zmp_time_calc_x_(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + 1 + (1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),0) + 0.02 - 0.01*(bool)(scenario_num_);
         zmp_time_calc_y_(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + 1 + (1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),1);
 
         if(i < N_step)

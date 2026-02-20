@@ -1183,6 +1183,7 @@ public:
     Eigen::Vector3d com_support_current_ddot_;
     Eigen::Vector3d com_float_current_LPF;
     Eigen::Vector3d com_support_cp_;
+    double com_real_robot_scenario_;
 
     Eigen::Vector3d com_float_current_dot;
     Eigen::Vector3d com_float_current_dot_prev;
