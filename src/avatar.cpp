@@ -681,27 +681,21 @@ void AvatarController::computeSlow()
 
                         CAM_upper_init_q_(13) = min(loco_q_13_1, loco_q_13_2);
 
-                        double box_grab_angle = 0.30;
+                        double box_grab_angle = 0.00;
 
-                        CAM_upper_init_q_(15) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(15), -box_grab_angle, 0.0, 0.0);
-                        CAM_upper_init_q_(25) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(25),  box_grab_angle, 0.0, 0.0);
+                        CAM_upper_init_q_(15) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(15), -0.00, 0.0, 0.0);
+                        CAM_upper_init_q_(25) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(25),  0.00, 0.0, 0.0);
 
-                        CAM_upper_init_q_(16) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(16), -0.50, 0.0, 0.0);
-                        CAM_upper_init_q_(26) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(26),  0.50, 0.0, 0.0);
+                        CAM_upper_init_q_(16) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(16), -0.00, 0.0, 0.0);
+                        CAM_upper_init_q_(26) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(26),  0.00, 0.0, 0.0);
 
-                        CAM_upper_init_q_(19) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(19), -1.27, 0.0, 0.0);
-                        CAM_upper_init_q_(29) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(29),  1.27, 0.0, 0.0);
+                        CAM_upper_init_q_(22) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(22), -1.27, 0.0, 0.0);
+                        CAM_upper_init_q_(32) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(32),  1.27, 0.0, 0.0);
 
                         if(walking_tick_ >= 5.0*hz_)
-                        {
-                            CAM_upper_init_q_(16) = DyrosMath::cubic(walking_tick_, t_temp_ - 3.0*hz_, t_temp_, -0.50,  0.00, 0.0, 0.0);
-                            CAM_upper_init_q_(26) = DyrosMath::cubic(walking_tick_, t_temp_ - 3.0*hz_, t_temp_,  0.50,  0.00, 0.0, 0.0);
-
-                            CAM_upper_init_q_(19) = DyrosMath::cubic(walking_tick_, t_temp_ - 3.0*hz_, t_temp_, -1.27, -1.52, 0.0, 0.0);
-                            CAM_upper_init_q_(29) = DyrosMath::cubic(walking_tick_, t_temp_ - 3.0*hz_, t_temp_,  1.27,  1.52, 0.0, 0.0);
-
-                            CAM_upper_init_q_(22) = DyrosMath::cubic(walking_tick_, 5.0*hz_, t_temp_ - 3.0*hz_, Initial_ref_q_(22), -1.57 + box_grab_angle, 0.0, 0.0);
-                            CAM_upper_init_q_(32) = DyrosMath::cubic(walking_tick_, 5.0*hz_, t_temp_ - 3.0*hz_, Initial_ref_q_(32),  1.57 + box_grab_angle, 0.0, 0.0);
+                        {   
+                            CAM_upper_init_q_(15) = DyrosMath::cubic(walking_tick_, 5.0*hz_, 8.0*hz_,               0.00, -0.40, 0.0, 0.0);
+                            CAM_upper_init_q_(25) = DyrosMath::cubic(walking_tick_, 5.0*hz_, 8.0*hz_,               0.00,  0.40, 0.0, 0.0);
                         }
                     }
                 }
