@@ -551,39 +551,6 @@ void AvatarController::computeSlow()
             }
 
             CAM_upper_init_q_(13) = 0.15;
-            if(!param_stepping_stone_)
-            {
-                CAM_upper_init_q_(15) =   0.00; // Left Shoulder Yaw joint // 17 deg
-                CAM_upper_init_q_(16) = - 0.75; // Left Shoulder Pitch joint // 17 deg
-                CAM_upper_init_q_(17) =   1.40; // Left Shoulder Roll joint // 86 deg
-                CAM_upper_init_q_(18) = - 1.57; // Left Elbow Yaw joint // -72 deg
-                CAM_upper_init_q_(19) = - 1.12; // Left Elbow Pitch joint // -57 deg
-                CAM_upper_init_q_(20) =   1.31; // Left Elbow Pitch joint // -57 deg
-                CAM_upper_init_q_(21) = - 1.57; // Left Elbow Pitch joint // -57 deg
-                CAM_upper_init_q_(22) = - 0.00; // Left Elbow Pitch joint // -57 deg
-
-                CAM_upper_init_q_(25) = - 0.00; // Right Shoulder Yaw joint // -17 deg
-                CAM_upper_init_q_(26) =   0.75; // Right Shoulder Pitch joint           
-                CAM_upper_init_q_(27) = - 1.40; // Right Shoulder Roll joint 
-                CAM_upper_init_q_(28) =   1.57; // Right Elbow Yaw joint
-                CAM_upper_init_q_(29) =   1.12; // Right Elbow Pich joint           
-                CAM_upper_init_q_(30) = - 1.31; // Right Elbow Pich joint           
-                CAM_upper_init_q_(31) =   1.57; // Right Elbow Pich joint           
-                CAM_upper_init_q_(32) =   0.00; // Right Elbow Pich joint           
-                /*
-                CAM_upper_init_q_(15) = + 15.0 * DEG2RAD; // Left Shoulder Yaw joint // 17 deg
-                CAM_upper_init_q_(16) = + 10.0 * DEG2RAD; // Left Shoulder Pitch joint // 17 deg
-                CAM_upper_init_q_(17) = + 65.0 * DEG2RAD; // Left Shoulder Roll joint // 86 deg
-                CAM_upper_init_q_(18) = - 70.0 * DEG2RAD; // Left Elbow Yaw joint // -72 deg
-                CAM_upper_init_q_(19) = - 65.0 * DEG2RAD; // Left Elbow Pitch joint // -57 deg
-                
-                CAM_upper_init_q_(25) = - 15.0 * DEG2RAD; // Right Shoulder Yaw joint // -17 deg
-                CAM_upper_init_q_(26) = - 10.0 * DEG2RAD; // Right Shoulder Pitch joint           
-                CAM_upper_init_q_(27) = - 65.0 * DEG2RAD; // Right Shoulder Roll joint 
-                CAM_upper_init_q_(28) = + 70.0 * DEG2RAD; // Right Elbow Yaw joint
-                CAM_upper_init_q_(29) = + 65.0 * DEG2RAD; // Right Elbow Pich joint                       
-                */
-            }
             
             q_prev_MJ_ = rd_.q_;
             walking_tick_ = 0;
@@ -705,42 +672,37 @@ void AvatarController::computeSlow()
 
                 //e_tmp_graph17 << q_des_(7) << "," << rd_.q_(7) << "," << R_angle << "," << R_angle_input << endl;
 
-                if(walking_tick_ < t_temp_ - 1.0*hz_)
-                {
-                    double calc_13_1 = DyrosMath::cubic(walking_tick_, t_temp_ - 8.0*hz_, t_temp_ - 7.0*hz_, Initial_ref_q_(13), 0.40, 0.0, 0.0);
-                    double calc_13_2 = DyrosMath::cubic(walking_tick_, t_temp_ - 2.0*hz_, t_temp_ - 1.0*hz_, 0.40, 0.15, 0.0, 0.0);
-                    
-                    //if(scenario_num_ || param_stepping_stone_)
-                    if(scenario_num_)
+                if(walking_tick_ < t_temp_)
+                {                    
+                    if(param_loco_manipulation_)
                     {
-                        if(param_loco_manipulation_)
+                        double loco_q_13_1 = DyrosMath::cubic(walking_tick_,           2.0*hz_,           5.0*hz_, Initial_ref_q_(13), 0.40, 0.0, 0.0);
+                        double loco_q_13_2 = DyrosMath::cubic(walking_tick_, t_temp_ - 3.0*hz_, t_temp_ - 0.0*hz_,               0.40, 0.15, 0.0, 0.0);
+
+                        CAM_upper_init_q_(13) = min(loco_q_13_1, loco_q_13_2);
+
+                        double box_grab_angle = 0.30;
+
+                        CAM_upper_init_q_(15) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(15), -box_grab_angle, 0.0, 0.0);
+                        CAM_upper_init_q_(25) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(25),  box_grab_angle, 0.0, 0.0);
+
+                        CAM_upper_init_q_(16) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(16), -0.50, 0.0, 0.0);
+                        CAM_upper_init_q_(26) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(26),  0.50, 0.0, 0.0);
+
+                        CAM_upper_init_q_(19) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(19), -1.27, 0.0, 0.0);
+                        CAM_upper_init_q_(29) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(29),  1.27, 0.0, 0.0);
+
+                        if(walking_tick_ >= 5.0*hz_)
                         {
-                            //CAM_upper_init_q_(13) = min(calc_13_1, calc_13_2);
+                            CAM_upper_init_q_(16) = DyrosMath::cubic(walking_tick_, t_temp_ - 3.0*hz_, t_temp_, -0.50,  0.00, 0.0, 0.0);
+                            CAM_upper_init_q_(26) = DyrosMath::cubic(walking_tick_, t_temp_ - 3.0*hz_, t_temp_,  0.50,  0.00, 0.0, 0.0);
+
+                            CAM_upper_init_q_(19) = DyrosMath::cubic(walking_tick_, t_temp_ - 3.0*hz_, t_temp_, -1.27, -1.52, 0.0, 0.0);
+                            CAM_upper_init_q_(29) = DyrosMath::cubic(walking_tick_, t_temp_ - 3.0*hz_, t_temp_,  1.27,  1.52, 0.0, 0.0);
+
+                            CAM_upper_init_q_(22) = DyrosMath::cubic(walking_tick_, 5.0*hz_, t_temp_ - 3.0*hz_, Initial_ref_q_(22), -1.57 + box_grab_angle, 0.0, 0.0);
+                            CAM_upper_init_q_(32) = DyrosMath::cubic(walking_tick_, 5.0*hz_, t_temp_ - 3.0*hz_, Initial_ref_q_(32),  1.57 + box_grab_angle, 0.0, 0.0);
                         }
-
-                        CAM_upper_init_q_(15) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(15),  0.00, 0.0, 0.0);
-                        CAM_upper_init_q_(25) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(25), -0.00, 0.0, 0.0);
-
-                        CAM_upper_init_q_(16) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(16), -0.70, 0.0, 0.0);
-                        CAM_upper_init_q_(26) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(26),  0.70, 0.0, 0.0);
-
-                        CAM_upper_init_q_(17) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(17),  1.40, 0.0, 0.0);
-                        CAM_upper_init_q_(27) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(27), -1.40, 0.0, 0.0);
-                    
-                        CAM_upper_init_q_(18) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(18), -1.57, 0.0, 0.0);
-                        CAM_upper_init_q_(28) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(28),  1.57, 0.0, 0.0);
-
-                        CAM_upper_init_q_(19) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(19), -1.12, 0.0, 0.0);
-                        CAM_upper_init_q_(29) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(29),  1.12, 0.0, 0.0);
-
-                        CAM_upper_init_q_(20) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(20),  1.31, 0.0, 0.0);
-                        CAM_upper_init_q_(30) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(30), -1.31, 0.0, 0.0);
-
-                        CAM_upper_init_q_(21) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(21), -1.57, 0.0, 0.0);
-                        CAM_upper_init_q_(31) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(31),  1.57, 0.0, 0.0);
-
-                        CAM_upper_init_q_(22) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(22),  0.00, 0.0, 0.0);
-                        CAM_upper_init_q_(32) = DyrosMath::cubic(walking_tick_, t_temp_ - 6.0*hz_, t_temp_ - 4.0*hz_,  Initial_ref_q_(32), -0.00, 0.0, 0.0);
                     }
                 }
 
@@ -5782,9 +5744,10 @@ void AvatarController::computeThread3()
     if((scenario_num_ == 0)
     && (walking_tick_mpc_ - com_start_tick_mpc_ > 2*t_total_mpc_ - hz_/thread3_hz_)
     && (current_step_num_mpc_ == total_step_num_mpc_ - 1)
-    && (param_loco_manipulation_ == 1))
+    && (param_loco_manipulation_ == 1)
+    && (scenario_end_num_ > 0))
     {
-        cout << "STABILIZER IS NOT RUNNED In This TICK FOR SMOOTH GRF" << endl << endl;
+        cout << "STABILIZER IS NOT RUNNED In this TICK FOR SMOOTH GRF" << endl << endl;
     }
     else
     {
@@ -7740,10 +7703,10 @@ void AvatarController::addZmpOffset()
 {
     double lfoot_zmp_offset_, rfoot_zmp_offset_;
 
-    lfoot_zmp_offset_ = -0.02;
-    rfoot_zmp_offset_ =  0.02;
+    lfoot_zmp_offset_ = -(0.045 - 0.015*(1 - (bool)current_step_num_));
+    rfoot_zmp_offset_ =  (0.045 - 0.015*(1 - (bool)current_step_num_));
     
-    if(mpc_on_bool_)
+    if(!param_sim_mode_)
     {
         lfoot_zmp_offset_ = -(0.055 - 0.015*(1 - (bool)current_step_num_));
         rfoot_zmp_offset_ =  (0.045 - 0.015*(1 - (bool)current_step_num_));
@@ -7765,7 +7728,10 @@ void AvatarController::addZmpOffset()
     for (int i = 0; i < total_step_num_; i++)
     //for (int i = current_step_num_; i < min(total_step_num_, current_step_num_ + 3); i++)
     {
-        if(mpc_on_bool_)
+        lfoot_zmp_offset_ = -(0.045 - 0.015*(1 - (bool)current_step_num_));
+        rfoot_zmp_offset_ =  (0.045 - 0.015*(1 - (bool)current_step_num_));
+
+        if(!param_sim_mode_)
         {
             lfoot_zmp_offset_ = -(0.055 - 0.015*(1 - (bool)current_step_num_));
             rfoot_zmp_offset_ =  (0.045 - 0.015*(1 - (bool)current_step_num_));
@@ -7848,15 +7814,10 @@ void AvatarController::zmpGenerator(const unsigned int norm_size, const unsigned
 
     unsigned int index = 0;
     double t_total_zmp = t_total_const_;
-    if(walking_tick_ == 0)
-    {
-        com_real_robot_scenario_ = com_support_current_(0) - 0.02;
-    }
 
     if (current_step_num_ == 0)  
     {
-        //ref_zmp_.block(0, 0, 1.0*hz_, 1).setConstant(com_support_init_(0));
-        ref_zmp_.block(0, 0, 1.0*hz_, 1).setConstant(com_real_robot_scenario_);
+        ref_zmp_.block(0, 0, 1.0*hz_, 1).setConstant(com_support_init_(0));
         ref_zmp_.block(0, 1, 1.0*hz_, 1).setConstant(com_support_init_(1));
         
         ref_vrp_.block(0, 0, 1.0*hz_, 2) = ref_zmp_.block(0, 0, 1.0*hz_, 2);
@@ -7871,8 +7832,7 @@ void AvatarController::zmpGenerator(const unsigned int norm_size, const unsigned
         {
             double del_x = i - 1.0 * hz_;
 
-            //ref_zmp_(i, 0) = com_support_init_(0) - del_x * com_support_init_(0) / (1.0 * hz_);
-            ref_zmp_(i, 0) = com_real_robot_scenario_ - del_x * com_real_robot_scenario_ / (1.0 * hz_);
+            ref_zmp_(i, 0) = com_support_init_(0) - del_x * com_support_init_(0) / (1.0 * hz_);
             ref_zmp_(i, 1) = com_support_init_(1);
             
             ref_vrp_(i, 0) = ref_zmp_(i, 0);
