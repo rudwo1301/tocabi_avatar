@@ -72,6 +72,8 @@ public:
     RigidBodyDynamics::Model model_C_;  //for calcuating Coriolis matrix
     RigidBodyDynamics::Model model_MJ_;  //for calcuating CMM
 
+    ifstream e_tmp_graph17_ext_dist;
+    
     //////////dg custom controller functions/////////////////
     void setGains();
     void getRobotData();
