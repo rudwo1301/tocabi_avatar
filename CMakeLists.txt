@@ -8,6 +8,7 @@ roscpp
 tocabi_lib
 tocabi_msgs
 eigen_conversions
+OsqpEigen
 )
 
 # find_package(lexls REQUIRED)
@@ -26,15 +27,18 @@ catkin_package(
 include_directories(
     include
     ${catkin_INCLUDE_DIRS}
+    /usr/local/include
 )
 
 add_library(${PROJECT_NAME}
   src/avatar.cpp
+  src/sgn_planner.cpp
 )
 add_dependencies(${PROJECT_NAME} ${${PROJECT_NAME}_EXPORTED_TARGETS} ${catkin_EXPORTED_TARGETS})
 
 target_link_libraries(${PROJECT_NAME}
   ${catkin_LIBRARIES}
+  OsqpEigen::OsqpEigen
 )
 
 # target_link_libraries(${PROJECT_NAME} PUBLIC lexls::lexls)

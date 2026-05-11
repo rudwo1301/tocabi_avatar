@@ -28,6 +28,8 @@
 #include "tocabi_msgs/WalkingCommand.h"
 #include <std_msgs/Float32.h>
 
+#include "sgn_planner.h"
+
 const std::string calibration_folder_dir_ = "/home/dyros/data/vive_tracker/calibration_log/dh";  //tocabi 
 
 double thread3_hz_ = 0.0;
@@ -47,6 +49,8 @@ public:
     void computeFast();
     void computeThread3();
     void copyRobotData(RobotData &rd_l);
+
+    SgnPlanner sgn_planner_;
 
     RobotData &rd_;
     RobotData rd_cc_;
@@ -1095,6 +1099,7 @@ public:
     void onestepZmp(unsigned int current_step_number, Eigen::VectorXd& temp_px, Eigen::VectorXd& temp_py);
     void onestepZmp_wo_offset(unsigned int current_step_number, double t_total_zmp, Eigen::VectorXd& temp_px, Eigen::VectorXd& temp_py, Eigen::VectorXd& temp_px_wo_offset, Eigen::VectorXd& temp_py_wo_offset);
     void onestepVrpZ(unsigned int current_step_number, double t_total_zmp, Eigen::VectorXd& temp_pz);
+    void onestepAlpha(unsigned int current_step_number, double t_total_zmp, Eigen::VectorXd& temp_alpha);
     void getComTrajectory();
     void getComTrajectory_FIPM();
     void getFootTrajectory();
@@ -1265,6 +1270,20 @@ public:
     Eigen::MatrixXd ref_vrp_;
     Eigen::MatrixXd ref_vrp_mpc_;
     Eigen::MatrixXd ref_vrp_container_to_mpc_;
+
+    Eigen::MatrixXd ref_com_;
+    Eigen::MatrixXd ref_com_l_;
+    Eigen::MatrixXd ref_com_r_;    
+    Eigen::MatrixXd ref_com_mpc_;
+    Eigen::MatrixXd ref_com_l_mpc_;
+    Eigen::MatrixXd ref_com_r_mpc_;
+    Eigen::MatrixXd ref_com_container_to_mpc_;
+    Eigen::MatrixXd ref_com_l_container_to_mpc_;
+    Eigen::MatrixXd ref_com_r_container_to_mpc_;
+
+    Eigen::MatrixXd ref_alpha_;
+    Eigen::MatrixXd ref_alpha_mpc_;
+    Eigen::MatrixXd ref_alpha_container_to_mpc_;
 
     Eigen::Vector3d xs_mj_;
     Eigen::Vector3d ys_mj_;
@@ -1454,10 +1473,6 @@ public:
 
     int total_step_num_container_to_mpc_;
 
-    Eigen::MatrixXd ref_com_;
-    Eigen::MatrixXd ref_com_mpc_;
-    Eigen::MatrixXd ref_com_container_to_mpc_;
-
     Eigen::MatrixXd A_main_;
     Eigen::MatrixXd B_main_;
     Eigen::MatrixXd A_mpc_;
@@ -1561,9 +1576,10 @@ public:
     Eigen::MatrixXd ssy_plan_mpc_;
     Eigen::MatrixXd ssz_plan_mpc_;
 
-    Eigen::VectorXd MPC_Planner_state_mpc_;          
+    Eigen::VectorXd MPC_Planner_state_mpc_;
     Eigen::VectorXd MPC_Planner_state_container_from_mpc_;   
     Eigen::VectorXd MPC_Planner_state_main_; 
+    Eigen::VectorXd MPC_sgn_Planner_state_mpc_;
     Eigen::VectorXd Planner_state_main_calc_;
     Eigen::VectorXd MPC_Planner_state_from_mpc_to_main_;
     
