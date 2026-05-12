@@ -719,8 +719,8 @@ Eigen::VectorXd SgnPlanner::runPlanner(const double& mpc_freq, const double& mpc
     {
         if(sgn_data_save_)
         {
-            e_sgn_data[sgn_file_num_ - 2] << Eigen::MatrixXd(sgn_Hessian_) << endl;
-            e_sgn_data[sgn_file_num_ - 3] << Eigen::MatrixXd(sgn_HD_) << endl;
+            //e_sgn_data[sgn_file_num_ - 2] << Eigen::MatrixXd(sgn_Hessian_) << endl;
+            //e_sgn_data[sgn_file_num_ - 3] << Eigen::MatrixXd(sgn_HD_) << endl;
             //e_sgn_data[sgn_file_num_ - 4] << Eigen::MatrixXd(sgn_Hz_) << endl;
             //e_sgn_data[sgn_file_num_ - 5] << Eigen::MatrixXd(sgn_H_)  << endl;
             //e_sgn_data[sgn_file_num_ - 6] << Eigen::MatrixXd(sgn_D_total_) << endl;
