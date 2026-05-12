@@ -679,8 +679,8 @@ void AvatarController::computeSlow()
             if (current_step_num_ < total_step_num_)
             {   
                 getZmpTrajectory();
-                //getComTrajectory_mpc();
-                getComTrajectory_FIPM();
+                getComTrajectory_mpc();
+                //getComTrajectory_FIPM();
                 getFootTrajectory();
                 getPelvTrajectory(); 
                 supportToFloatPattern();
@@ -5791,27 +5791,26 @@ void AvatarController::computeThread3()
     //double preview_time = 1.2;
 
     Eigen::VectorXd MPC_sgn_planner_calculated; MPC_sgn_planner_calculated.setZero(3);
-    cout << "t11" << endl;
+
     sgn_planner_.updateMpcParam(thread3_hz_, 1.0/thread3_hz_, preview_time, 2000/thread3_hz_);
-    cout << "t11" << endl;
+
     sgn_planner_.getInitWalkingParam(w_, t_start_mpc_, t_total_mpc_, total_step_num_mpc_);
-    cout << "t11" << endl;
+
     sgn_planner_.updateWalkingParam(walking_tick_mpc_, com_start_tick_mpc_, current_step_num_mpc_);
-    cout << "t11" << endl;
+
     sgn_planner_.getFootStepSupportFrame(foot_step_support_frame_offset_mpc_, foot_step_support_frame_mpc_);
-    cout << "t11" << endl;
+
     sgn_planner_.calculateRef(ref_com_mpc_, ref_alpha_mpc_);
-    cout << "t11" << endl;
+
     sgn_planner_.setInitialState(MPC_sgn_Planner_state_mpc_);
-    cout << "t11" << endl;
+
     MPC_sgn_planner_calculated = sgn_planner_.runPlanner(thread3_hz_, 1.0/thread3_hz_, preview_time, 2000/thread3_hz_);
     std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
     e_mpc_time_graph << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()*1e-6 << ",";
-    cout << "t11" << endl;
     IS_FIPM_CoM_Planner_MPC(thread3_hz_, 1.0/thread3_hz_, preview_time, 2000/thread3_hz_);
-    cout << "t11" << endl;
+
     IS_FIPM_3D_DCM_Stabililzer_MPC(thread3_hz_, preview_time);
-    cout << "t11" << endl;
+
     //send mpc data
     if(atb_mpc_to_main_update_ == false)
     {
@@ -5842,8 +5841,7 @@ void AvatarController::computeThread3()
     
     econom2_thread_stepchange();
     std::chrono::steady_clock::time_point t3 = std::chrono::steady_clock::now();
-    cout << "t11" << endl;
-    cout << endl;
+
     e_mpc_time_graph << std::chrono::duration_cast<std::chrono::microseconds>(t3 - t2).count()*1e-6 << endl;
     }
 }
@@ -7852,7 +7850,7 @@ void AvatarController::getZmpTrajectory()
     foot_step_support_frame_offset_.block(current_step_num_,                               0, 1, 2) += del_F_.transpose();
     foot_step_support_frame_offset_.block(min(current_step_num_ + 1, total_step_num_ - 1), 0, 1, 2) += del_F_.transpose();
     foot_step_support_frame_offset_.block(min(current_step_num_ + 2, total_step_num_ - 1), 0, 1, 2) += del_F_.transpose();
-cout << "22" << endl;
+
     zmpGenerator(planning_zmp_size, planning_step_number);
 
     if(walking_tick_ - t_start_ < t_dsp1_const_)
@@ -8004,13 +8002,9 @@ void AvatarController::zmpGenerator(const unsigned int norm_size, const unsigned
                 t_total_zmp = t_total_const_;
             }
 
-            cout << "33" << endl;
             onestepZmp_wo_offset(i, t_total_zmp, temp_px, temp_py, temp_px_wo_offset, temp_py_wo_offset); // temp px, py에 1 step의 ZMP를 planning step num 번 담는다.
-            cout << "33" << endl;
             onestepVrpZ(i, t_total_zmp, temp_pz);
-            cout << "33" << endl;
             onestepAlpha(i, t_total_zmp, temp_alpha);
-            cout << "33" << endl;
 
             ref_zmp_.block(index, 0, t_total_zmp, 1) = temp_px.block(0, 0, t_total_zmp, 1);
             ref_zmp_.block(index, 1, t_total_zmp, 1) = temp_py.block(0, 0, t_total_zmp, 1);
@@ -8321,22 +8315,20 @@ void AvatarController::onestepAlpha(unsigned int current_step_number, double t_t
 
     double dsp1_scale = t_dsp1_/(t_dsp1_ + t_dsp2_);
     double dsp2_scale = t_dsp2_/(t_dsp1_ + t_dsp2_);
-    cout << "44" << endl;
+
     alpha0_y_dsp1 = dsp1_scale * (1 - foot_step_(current_step_number, 6))*((bool)current_step_number) + (1 - bool(current_step_number))*0.5;
-    cout << "44" << endl;
     alphaT_y_dsp1 = foot_step_(current_step_number, 6);
     alpha0_y_ssp  = foot_step_(current_step_number, 6);
     alphaT_y_ssp  = foot_step_(current_step_number, 6);
     alpha0_y_dsp2 = foot_step_(current_step_number, 6);
-    cout << "44" << endl;
     alphaT_y_dsp2 = (1 - dsp2_scale) * foot_step_(current_step_number, 6) + dsp2_scale * (1 - foot_step_(current_step_number, 6));
-    cout << "44" << endl;
+
     alpha_plan_lin_calc.setLinSpaced(t_dsp1_, alpha0_y_dsp1,    alphaT_y_dsp1);
     temp_alpha.segment(0, t_dsp1_) = alpha_plan_lin_calc;
-    cout << "44" << endl;
+
     alpha_plan_lin_calc.setLinSpaced(t_ssp_, alpha0_y_ssp,    alphaT_y_ssp);
     temp_alpha.segment(t_dsp1_, t_ssp_) = alpha_plan_lin_calc;
-    cout << "44" << endl;
+
     alpha_plan_lin_calc.setLinSpaced(t_dsp2_, alpha0_y_dsp2,    alphaT_y_dsp2);
     temp_alpha.segment(t_dsp1_ + t_ssp_, t_dsp2_) = alpha_plan_lin_calc;
 }
@@ -9343,8 +9335,9 @@ void AvatarController::getComTrajectory_mpc()
         foot_step_support_frame_offset_mpc_              = foot_step_support_frame_offset_;
         foot_step_support_frame_offset_container_to_mpc_ = foot_step_support_frame_offset_;
 
-        //thread3_hz_ = 50.0;
-        thread3_hz_ = 40.0;
+        thread3_hz_ = 50.0;
+        //thread3_hz_ = 40.0;
+        //thread3_hz_ = 30.0;
 
         //step_enable_time_fwd_ = 0.10;
         step_enable_time_fwd_ = 0.15;
@@ -10446,13 +10439,15 @@ void AvatarController::IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, d
     constraint_index += 1;
 
     QP_MPC_Planner_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
-
-    if(QP_MPC_Planner_.SolveQPoases(100, MPC_Planner_SQP_du_mpc_))
+    
+    //if(QP_MPC_Planner_.SolveQPoases(100, MPC_Planner_SQP_du_mpc_))
+    if(1)
     {
         //if((walking_tick_mpc_ - mpc_synchro_hz - 20)%int(2*hz_) == 0)
         if((((walking_tick_mpc_ - int(mpc_synchro_hz) + 1)/int(mpc_synchro_hz))%60) == 0) //30hz
         { cout << "IS FIPM Planner MPC Solved" << endl;; }
         
+        MPC_Planner_SQP_du_mpc_.setZero();
         MPC_Planner_u_mpc_ = MPC_Planner_u_mpc_ + MPC_Planner_SQP_du_mpc_;
 
         Planner_State_Prev_mpc_.row(0).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_.segment(0*N_plan_mpc, N_plan_mpc);
@@ -10898,7 +10893,7 @@ e_tmp_graph24 << data_save_calc.transpose() << endl;
     SQP_deldel_Qcalc_stab_mpc_ = Qcalc_stab_mpc_;
 
     //int sqp_iter = 2;
-    int sqp_iter = 4;
+    int sqp_iter = 1;
 
     const_A_mpc_.setZero(const_num, input_num);
     const_lb_mpc_.setZero(const_num, 1);
@@ -11250,7 +11245,8 @@ e_tmp_graph24 << data_save_calc.transpose() << endl;
 
         QP_MPC_Stabilizer_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
 
-        if(QP_MPC_Stabilizer_.SolveQPoases(100, MPC_Stabilizer_SQP_du_mpc_))
+        //if(QP_MPC_Stabilizer_.SolveQPoases(100, MPC_Stabilizer_SQP_du_mpc_))
+        if(1)
         {
             //if((walking_tick_mpc_ - int(MPC_synchro_hz_) - 20)%int(2*hz_) == 0)
             if((((walking_tick_mpc_ - int(MPC_synchro_hz_) + 1)/int(MPC_synchro_hz_))%60) == 0) //30hz
@@ -11259,7 +11255,7 @@ e_tmp_graph24 << data_save_calc.transpose() << endl;
                 cout << "IS FIPM DCM Stabilizer Stepping Solved" << endl;
                 if(s == sqp_iter - 1) { cout << endl; }
             }
-
+            MPC_Stabilizer_SQP_du_mpc_.setZero();
             MPC_Stabilizer_u_mpc_ = MPC_Stabilizer_u_mpc_ + MPC_Stabilizer_SQP_du_mpc_;
 
             if(s == sqp_iter - 1)

@@ -43,8 +43,9 @@ void SgnPlanner::updateMpcParam(const double& mpc_freq, const double& mpc_dt, co
 
 void SgnPlanner::updateWalkingParam(const double& walking_tick_mpc, const double& com_start_tick_mpc, const int& current_step_num_mpc)
 {
-    sgn_matlab_tick_ = int(walking_tick_mpc - 65)/66 + 1;
+    sgn_matlab_tick_ = int(walking_tick_mpc - floor(sgn_mpc_dt_/sgn_dt_) + 1)/floor(sgn_mpc_dt_/sgn_dt_) + 1;
     cout << "sgn_matlab_tick_: " << sgn_matlab_tick_ << endl;
+
     sgn_walking_tick_mpc_ = walking_tick_mpc;
     sgn_mpc_tick_ = walking_tick_mpc - com_start_tick_mpc;
     sgn_current_step_num_mpc_ = current_step_num_mpc;
@@ -714,7 +715,7 @@ Eigen::VectorXd SgnPlanner::runPlanner(const double& mpc_freq, const double& mpc
     sgn_G0.setZero(sgn_state_num_ * sgn_N_plan_mpc_);
     sgn_gradient_ << sgn_JX_, sgn_JU_, sgn_G0;
 
-    if(sgn_matlab_tick_ == 40) // 182
+    if(sgn_matlab_tick_ == 4.4 * sgn_mpc_freq_) // 182
     {
         if(sgn_data_save_)
         {

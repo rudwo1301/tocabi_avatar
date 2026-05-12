@@ -32,8 +32,6 @@
 
 const std::string calibration_folder_dir_ = "/home/dyros/data/vive_tracker/calibration_log/dh";  //tocabi 
 
-double thread3_hz_ = 0.0;
-
 class AvatarController
 {
 public:
@@ -51,6 +49,8 @@ public:
     void copyRobotData(RobotData &rd_l);
 
     SgnPlanner sgn_planner_;
+
+    double thread3_hz_ = 0.0;
 
     RobotData &rd_;
     RobotData rd_cc_;
