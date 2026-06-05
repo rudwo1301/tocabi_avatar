@@ -679,6 +679,7 @@ void AvatarController::computeSlow()
             if (current_step_num_ < total_step_num_)
             {   
                 getZmpTrajectory();
+                cout << "lin vel: " << rd_.q_dot_virtual_.segment(0, 3).transpose() << endl;
                 getComTrajectory_mpc();
                 //getComTrajectory_FIPM();
                 getFootTrajectory();
