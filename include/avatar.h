@@ -1,7 +1,6 @@
 #include "tocabi_lib/robot_data.h"
 #include "wholebody_functions.h"
 #include <std_msgs/String.h>
-#include "gurobi/gurobi_c++.h"
 
 #include "math_type_define.h"
 #include <std_msgs/Float32MultiArray.h>
@@ -53,8 +52,6 @@ const std::string calibration_folder_dir_ = "/home/dyros/data/vive_tracker/calib
 // const std::string calibration_folder_dir_ = "/home/dg/data/vive_tracker/calibration_log/kaleem";    //dg pc
 //const std::string calibration_folder_dir_ = "/home/dh-sung/data/avatar/calibration_log/dg";  //master ubuntu 
 
-double thread3_hz_ = 0.0;
-
 class AvatarController
 {
 public:
@@ -72,6 +69,7 @@ public:
     void computePlanner();
     void copyRobotData(RobotData &rd_l);
 
+    double thread3_hz_ = 20.0;
 
     RobotData &rd_;
     RobotData rd_cc_;
