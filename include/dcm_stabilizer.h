@@ -16,7 +16,7 @@ class dcmStabilizer
         //functions
         void ofstream_open();
         void ofstream_close();
-        void IS_FIPM_3D_DCM_Stabililzer_MPC(double mpc_freq, double mpc_preview_window);
+        void IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_preview_window);
 
         //variables
         //walking parameters

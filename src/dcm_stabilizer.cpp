@@ -34,7 +34,7 @@ void dcmStabilizer::ofstream_close()
     }
 }
 
-void dcmStabilizer::IS_FIPM_3D_DCM_Stabililzer_MPC(double mpc_freq, double mpc_preview_window)
+void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_preview_window)
 {
     double Q_dcm_x, Q_dcm_y, Q_dcm_z, R_dcm_x, R_dcm_y, R_dcm_z, R_dalp, R_df_x, R_df_y;
 
