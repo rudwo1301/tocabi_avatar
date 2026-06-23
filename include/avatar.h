@@ -30,6 +30,9 @@
 
 #include "sgn_planner.h"
 
+#include "fipm_planner.h"
+#include "dcm_stabilizer.h"
+
 const std::string calibration_folder_dir_ = "/home/dyros/data/vive_tracker/calibration_log/dh";  //tocabi 
 
 class AvatarController
@@ -54,6 +57,11 @@ public:
 
     RobotData &rd_;
     RobotData rd_cc_;
+
+    double thread3_hz_ = 0.0;
+
+    fipmPlanner fipm_planner_;
+    dcmStabilizer dcm_stabilizer_;
 
     ros::NodeHandle nh_avatar_;
     ros::CallbackQueue queue_avatar_;
@@ -1451,10 +1459,14 @@ public:
 
     //IS MPC QCQP
     void IS_LIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
-    void IS_LIPM_CoM_sep_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
     void IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
-    void IS_LIPM_DCM_Stabilizer_MPC(double mpc_freq, double preview_window);
     void IS_FIPM_3D_DCM_Stabililzer_MPC(double mpc_freq, double preview_window);
+    void sendingDataToPlanner();
+    void receivingDataFromPlanner();
+    void sendingDataToStabilizer();
+    void receivingDataFromStabilizer();
+    void dataFromContainerToMPC();
+    void dataFromMPCToContainer();
     void econom2_thread_stepchange();
 
     //Matrix
