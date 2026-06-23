@@ -1435,8 +1435,8 @@ public:
     Eigen::Vector3d foot_ori_compen_;
 
     //IS MPC QCQP
-    void IS_LIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
-    void IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
+    void IS_LIPM_CoM_Planner_MPC(double mpc_freq, double preview_window);
+    void IS_FIPM_CoM_Planner_MPC(double mpc_freq, double preview_window);
     void IS_FIPM_3D_DCM_Stabililzer_MPC(double mpc_freq, double preview_window);
     void sendingDataToPlanner();
     void receivingDataFromPlanner();

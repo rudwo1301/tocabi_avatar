@@ -16,7 +16,7 @@ class fipmPlanner
         //functions
         void ofstream_open();
         void ofstream_close();
-        void IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_preview_window);
+        void IS_FIPM_CoM_Planner_MPC(double mpc_freq, double preview_window);
         void MPC_State_Step_Change();
 
         //variables

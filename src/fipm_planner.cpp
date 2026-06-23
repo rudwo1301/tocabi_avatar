@@ -34,7 +34,7 @@ void fipmPlanner::ofstream_close()
     }
 }
 
-void fipmPlanner::IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_preview_window)
+void fipmPlanner::IS_FIPM_CoM_Planner_MPC(double mpc_freq, double preview_window)
 {
     double wpvx, wpvy, wpvz;
     double wdvx, wdvy, wdvz;
@@ -44,7 +44,7 @@ void fipmPlanner::IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_preview_wi
 
     int mpc_tick = walking_tick_mpc_ - com_start_tick_mpc_;
     double mpc_synchro_hz = hz_/mpc_freq;
-    const int N_plan_mpc = mpc_preview_window*mpc_freq;
+    const int N_plan_mpc = preview_window*mpc_freq;
     const int N_step = t_total_const_mpc_/mpc_synchro_hz;
     const int N_state = 3; //com position, com velocity, vrp position
     double dt_plan_mpc = 1/mpc_freq;
