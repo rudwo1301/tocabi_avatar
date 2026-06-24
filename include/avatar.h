@@ -1,7 +1,7 @@
 #include "tocabi_lib/robot_data.h"
 #include "wholebody_functions.h"
 #include <std_msgs/String.h>
-//#include "gurobi/gurobi_c++.h"
+#include "gurobi/gurobi_c++.h"
 
 #include "math_type_define.h"
 #include <std_msgs/Float32MultiArray.h>
@@ -41,7 +41,6 @@ public:
     Eigen::VectorQd getControl();
     std::ofstream calibration_log_file_ofstream_[4];
     std::ifstream calibration_log_file_ifstream_[4];
-
     //void taskCommandToCC(TaskCommand tc_);
 
     void computeSlow();
@@ -50,7 +49,7 @@ public:
     void copyRobotData(RobotData &rd_l);
 
     double thread3_hz_ = 0.0;
-    
+
     RobotData &rd_;
     RobotData rd_cc_;
 
@@ -1089,7 +1088,6 @@ public:
     void getRobotState();
     void calculateFootStepTotal();
     void calculateFootStepTotal_MJ();
-    void calculateFootStepTotal_ec2();
     void supportToFloatPattern();
     void floatToSupportFootstep();
     void GravityCalculate_MJ();
@@ -1117,7 +1115,6 @@ public:
 
     void CP_compen_MJ();
     void CP_compen_MJ_FT();
-    void contactWrenchCalculator();
     double damping_x = 0;
     double damping_y = 0;
     Eigen::Vector2d Tau_R;
@@ -1130,8 +1127,6 @@ public:
     Eigen::VectorQd ref_q_;
     Eigen::VectorQd Kp;
     Eigen::VectorQd Kd;
-    Eigen::VectorQd Kp_mj_;
-    Eigen::VectorQd Kd_mj_;
     Eigen::VectorQd desired_q_not_compensated_;
     
     Eigen::VectorQd q_prev_MJ_;
@@ -1142,8 +1137,6 @@ public:
     
     Eigen::Isometry3d rfoot_trajectory_support_;  //local frame
     Eigen::Isometry3d lfoot_trajectory_support_;
-    Eigen::Isometry3d rfoot_trajectory_support_ideal_;
-    Eigen::Isometry3d lfoot_trajectory_support_ideal_;
     Eigen::Vector3d rfoot_trajectory_euler_support_;
     Eigen::Vector3d lfoot_trajectory_euler_support_;
 
@@ -1189,7 +1182,6 @@ public:
     Eigen::Vector3d com_support_current_ddot_;
     Eigen::Vector3d com_float_current_LPF;
     Eigen::Vector3d com_support_cp_;
-    double com_real_robot_scenario_;
 
     Eigen::Vector3d com_float_current_dot;
     Eigen::Vector3d com_float_current_dot_prev;
@@ -1243,11 +1235,6 @@ public:
     Eigen::Isometry3d rfoot_support_current_calc_;
     Eigen::Vector6d   lfoot_support_current_dot_;
     Eigen::Vector6d   rfoot_support_current_dot_;
-    Eigen::Isometry3d lfoot_support_current_container_to_mpc_;
-    Eigen::Isometry3d rfoot_support_current_container_to_mpc_;
-    Eigen::Isometry3d lfoot_support_current_mpc_;
-    Eigen::Isometry3d rfoot_support_current_mpc_;
-
 
     Eigen::Isometry3d lfoot_support_init_;
     Eigen::Isometry3d rfoot_support_init_;
@@ -1340,9 +1327,6 @@ public:
     double target_z_;
     double com_height_;
     int is_right_foot_swing_;
-    
-    Eigen::VectorXd height_diff_vec_;
-    Eigen::VectorXd height_diff_terrain_vec_;
 
     int total_step_num_;
     int total_step_num_mpc_;
@@ -1351,7 +1335,6 @@ public:
 
     double UX_mj_, UY_mj_, UZ_mj_; 
     Eigen::Vector3d com_desired_;
-    Eigen::Vector3d com_dot_desired_;
     Eigen::MatrixXd foot_step_;
     Eigen::MatrixXd foot_step_support_frame_;
     Eigen::MatrixXd foot_step_support_frame_container_to_mpc_;
@@ -1415,28 +1398,25 @@ public:
     double param_ext_force_;
     double param_ext_theta_;
     int    param_scenario_;
-    bool   param_stepping_stone_;
-    bool   param_loco_manipulation_;
-    bool   param_disturbance_walking_;
 
-    double zmp_x_max = 0.15;
-    double zmp_x_min = 0.09;
-    //double zmp_x_min = 0.05;
-    double zmp_x_max_foot_width_ = 0.17;
-    double zmp_x_min_foot_width_ = 0.11;
+    double zmp_x_max = 0.16;
+    //double zmp_x_min = 0.10;
+    double zmp_x_min = 0.10;
+    double zmp_x_max_foot_width_ = 0.18;
+    double zmp_x_min_foot_width_ = 0.12;
     //double zmp_y_max = 0.10;
     //double zmp_y_min = 0.10;
     double zmp_y_max = 0.075;
     double zmp_y_min = 0.075;
-    double zmp_y_max_foot_width_ = 0.085;
-    double zmp_y_min_foot_width_ = 0.085;
+    double zmp_y_max_foot_width_ = 0.075;
+    double zmp_y_min_foot_width_ = 0.075;
 
     Eigen::Vector3d foot_pos_compen_;
     Eigen::Vector3d foot_ori_compen_;
 
     //IS MPC QCQP
-    void IS_LIPM_CoM_Planner_MPC(double mpc_freq, double preview_window);
-    void IS_FIPM_CoM_Planner_MPC(double mpc_freq, double preview_window);
+    void IS_LIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
+    void IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
     void IS_FIPM_3D_DCM_Stabililzer_MPC(double mpc_freq, double preview_window);
     void sendingDataToPlanner();
     void receivingDataFromPlanner();
@@ -1641,9 +1621,6 @@ public:
 
     Eigen::VectorXd MPC_Stabilizer_state_container_from_mpc_;
     Eigen::VectorXd MPC_Stabilizer_state_main_;
-    Eigen::VectorXd MPC_Stabilizer_state_main_p_;
-    Eigen::VectorXd MPC_Stabilizer_state_main_diff_;
-    Eigen::VectorXd MPC_Stabilizer_state_main_i_;
     Eigen::VectorXd MPC_Stabilizer_state_mpc_;
     Eigen::VectorXd Stabilizer_state_main_calc_; 
     Eigen::VectorXd MPC_Stabilizer_delf_mpc_;
@@ -1664,8 +1641,6 @@ public:
     Eigen::VectorXd MPC_Stabilizer_aux_mpc_x_;
     Eigen::VectorXd MPC_Stabilizer_aux_mpc_y_;
     Eigen::VectorXd MPC_Stabilizer_aux_main_;
-
-    int MPC_Stabilizer_interpol_;
 
     Eigen::VectorXd MPC_Stabilizer_u_mpc_;
     Eigen::VectorXd MPC_Stabilizer_u_mpc_sep_;
@@ -1705,7 +1680,6 @@ public:
     void getVirtualJointState(const Eigen::Isometry3d& transform_global_to_float, const Eigen::Isometry3d& transform_float_to_support);
     
     Eigen::VectorQd MitWholebodyInverseDynamicsController(const Eigen::VectorQd &torque_prev, const Eigen::VectorVQd &qddot_cmd, const Eigen::Vector12d &f_c_cmd);
-    Eigen::VectorQd WholebodyInverseDynamics_EC2(const Eigen::VectorQd &torque_prev, const Eigen::VectorVQd &qddot_cmd, const Eigen::Vector12d &f_c_cmd);
 
     Eigen::VectorVQd q_virtual_;
     Eigen::VectorVQd qdot_virtual_;
@@ -1723,9 +1697,6 @@ public:
     Eigen::VectorVQd Kp_virtual_;
     Eigen::VectorVQd Kd_virtual_;
 
-    Eigen::VectorVQd Kp_dyn_;
-    Eigen::VectorVQd Kd_dyn_;
-
     Eigen::Isometry3d lhand_trajectory_float_;
     Eigen::Isometry3d rhand_trajectory_float_;
     Eigen::Isometry3d chest_trajectory_float_;
@@ -1737,15 +1708,10 @@ public:
     Eigen::VectorQd torque_wbd_;
     Eigen::VectorQd torque_wbd_container_to_fast_;
     Eigen::VectorQd torque_wbd_fast_;
-
-    Eigen::VectorQd torque_sum_;
-    Eigen::VectorQd torque_sum_lpf_;
-    Eigen::VectorQd torque_pd_;
     
     Eigen::VectorQd torque_desired_prev_;
     Eigen::VectorQd torque_desired_prev_container_to_fast_;
     Eigen::VectorQd torque_desired_prev_fast_;
-    Eigen::VectorQd torque_desired_LPF_;
 
     Eigen::Vector6d lfoot_contact_wrench_;
     Eigen::Vector6d rfoot_contact_wrench_;
@@ -1789,9 +1755,7 @@ public:
 
 private:    
     unsigned int walking_tick_ = 0;
-    unsigned int mpc_tick_ = 0;
-    unsigned int scenario_num_  = 0;
-    unsigned int scenario_end_num_  = 2;
+    unsigned int scenario_tick_ = 0;
     unsigned int walking_tick_mpc_ = 0;
     unsigned int walking_tick_container_to_mpc_ = 0;
     unsigned int initial_tick_ = 0;
