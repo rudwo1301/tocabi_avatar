@@ -25,6 +25,9 @@ class dcmStabilizer
         double t_total_const_mpc_ = 0;
         double t_total_mpc_ = 0;
         double t_start_mpc_ = 0;
+        double t_temp_ = 0;
+        double t_dsp1_const_mpc_ = 0;
+        double t_dsp2_const_mpc_ = 0;
         double w_ = 0;
         double b_ = 0;
         int total_step_num_mpc_ = 0;
@@ -41,9 +44,16 @@ class dcmStabilizer
         Eigen::VectorXd zmp_max_y_mpc_;
         Eigen::VectorXd zmp_min_y_mpc_;
 
+        double step_enable_time_fwd_;
+        double step_enable_time_bwd_;
+        double step_enable_fix_time_pre_;
+        int step_time_adj_candidate_num_;
+
         Eigen::MatrixXd ref_vrp_mpc_;
 
         Eigen::MatrixXd ref_zmp_wo_offset_mpc_;
+
+        Eigen::MatrixXd foot_step_mpc_;
 
         Eigen::MatrixXd foot_step_support_frame_mpc_;
 
@@ -51,8 +61,6 @@ class dcmStabilizer
 
         Eigen::Vector3d com_measured_mpc_;
         Eigen::Vector3d com_dot_measured_mpc_;
-
-        int step_time_adj_candidate_num_;
 
         //mpc parameters
         double hz_ = 2000.0;
@@ -100,6 +108,9 @@ class dcmStabilizer
         Eigen::MatrixXd gypcalc_stab_mpc_;
         Eigen::MatrixXd gzpcalc_stab_mpc_;
 
+        Eigen::MatrixXd gxdfcalc_stab_mpc_;
+        Eigen::MatrixXd gydfcalc_stab_mpc_;
+
         Eigen::VectorXd MPC_Stabilizer_u_mpc_;
         Eigen::VectorXd MPC_Stabilizer_SQP_du_mpc_;
 
@@ -113,9 +124,13 @@ class dcmStabilizer
         Eigen::VectorXd MPC_Stabilizer_delf_mpc_x_;
         Eigen::VectorXd MPC_Stabilizer_delf_mpc_y_;
 
+        bool step_enable_bool_mpc_;
+        bool step_enable_bool_one_tick_before_mpc_;
+
         Eigen::MatrixXd ssx_stab_mpc_;
         Eigen::MatrixXd ssy_stab_mpc_;
         Eigen::MatrixXd ssz_stab_mpc_;
+        Eigen::MatrixXd Sf1_stab_mpc_;
 
         Eigen::MatrixXd SUp_stab_mpc_;
         Eigen::MatrixXd SUpx_stab_mpc_;
@@ -125,7 +140,17 @@ class dcmStabilizer
         Eigen::MatrixXd SUpz_stab_mpc_;
         Eigen::MatrixXd SUpzp_stab_mpc_;
 
-        Eigen::MatrixXd Sf1_stab_mpc_;
+        Eigen::MatrixXd SUf_stab_mpc_;
+        Eigen::MatrixXd SUfx_stab_mpc_;
+        Eigen::MatrixXd SUfy_stab_mpc_;
+        Eigen::MatrixXd SUfxf_stab_mpc_;
+        Eigen::MatrixXd SUfyf_stab_mpc_;
+
+        Eigen::MatrixXd SUalpha_stab_mpc_;
+
+        Eigen::MatrixXd SUaux_stab_mpc_;
+        Eigen::MatrixXd SUauxx_stab_mpc_;
+        Eigen::MatrixXd SUauxy_stab_mpc_;
 
         Eigen::VectorXd MPC_Stabilizer_u_mpc_sep_;
 

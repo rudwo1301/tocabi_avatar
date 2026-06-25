@@ -275,7 +275,7 @@ void fipmPlanner::IS_FIPM_CoM_Planner_MPC(double mpc_freq, double preview_window
 
     for(int i = 0; i < N_plan_mpc; i++)
     {
-        Pv_x_ref(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i+1),0);
+        Pv_x_ref(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i+1),0) + 0.02;
         Pv_y_ref(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i+1),1);
         Pv_z_ref(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i+1),2);
 
@@ -578,7 +578,13 @@ void fipmPlanner::IS_FIPM_CoM_Planner_MPC(double mpc_freq, double preview_window
 }
 
 void fipmPlanner::MPC_State_Step_Change()
-{
+{   
+    Eigen::Vector2d del_F_mpc; del_F_mpc.setZero();
+    del_F_mpc(0) = MPC_Stabilizer_delf_mpc_x_.sum() - foot_step_support_frame_mpc_(current_step_num_mpc_, 0);
+    del_F_mpc(1) = MPC_Stabilizer_delf_mpc_y_.sum() - foot_step_support_frame_mpc_(current_step_num_mpc_, 1);
+
+    foot_step_support_frame_mpc_(current_step_num_mpc_, 0) += del_F_mpc(0);
+    foot_step_support_frame_mpc_(current_step_num_mpc_, 1) += del_F_mpc(1);
     if((walking_tick_mpc_ - (t_start_mpc_ + t_total_mpc_) >= -hz_/thread3_hz_) && (current_step_num_mpc_ < total_step_num_mpc_ - 1))
     {
         Eigen::Vector3d var_after_step_change, var_before_step_change, frame_pos_diff;
@@ -619,4 +625,6 @@ void fipmPlanner::MPC_State_Step_Change()
         MPC_Planner_state_mpc_(5) = var_after_step_change(1);
         MPC_Planner_state_mpc_(8) = var_after_step_change(2);
     }
+    foot_step_support_frame_mpc_(current_step_num_mpc_, 0) -= del_F_mpc(0);
+    foot_step_support_frame_mpc_(current_step_num_mpc_, 1) -= del_F_mpc(1);
 }

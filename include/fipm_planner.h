@@ -145,5 +145,8 @@ class fipmPlanner
         Eigen::MatrixXd const_ub_mpc_;
         Eigen::MatrixXd const_lb_mpc_;
 
+        Eigen::VectorXd MPC_Stabilizer_delf_mpc_x_;
+        Eigen::VectorXd MPC_Stabilizer_delf_mpc_y_;
+        
         const double equality_condition_eps_ = 1e-8;
 };

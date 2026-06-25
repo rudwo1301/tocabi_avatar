@@ -75,7 +75,7 @@ AvatarController::AvatarController(RobotData &rd) : rd_(rd)
     calibration_state_pub = nh_avatar_.advertise<std_msgs::String>("/tocabi_status", 5);
     calibration_state_gui_log_pub = nh_avatar_.advertise<std_msgs::String>("/tocabi/guilog", 100);
 
-    mujoco_ext_force_apply_pub = nh_avatar_.advertise<std_msgs::Float32MultiArray>("/tocabi_avatar/applied_ext_force", 10);
+    mujoco_ext_force_apply_pub = nh_avatar_.advertise<std_msgs::Float32MultiArray>("/mujoco_ros_interface/applied_ext_force", 10);
     mujoco_applied_ext_force_.data.resize(7);
 
     pedal_command = nh_avatar_.subscribe("/tocabi/pedalcommand", 100, &AvatarController::PedalCommandCallback, this); //MJ
@@ -90,8 +90,6 @@ AvatarController::AvatarController(RobotData &rd) : rd_(rd)
     ros::param::get("/econom2_ext_step",param_ext_force_step_);
     ros::param::get("/econom2_extforce",param_ext_force_);
     ros::param::get("/econom2_exttheta",param_ext_theta_);
-
-    ros::param::get("/econom2_scenario",param_scenario_);
 
     RigidBodyDynamics::Addons::URDFReadFromFile(desc_package_path.c_str(), &model_d_, true, false);
     RigidBodyDynamics::Addons::URDFReadFromFile(desc_package_path.c_str(), &model_c_, true, false);
@@ -5562,6 +5560,7 @@ void AvatarController::sendingDataToStabilizer()
     dcm_stabilizer_.ref_vrp_mpc_                        = ref_vrp_mpc_;
     dcm_stabilizer_.foot_step_support_frame_offset_mpc_ = foot_step_support_frame_offset_mpc_;
     dcm_stabilizer_.foot_step_support_frame_mpc_        = foot_step_support_frame_mpc_;
+    dcm_stabilizer_.foot_step_mpc_                      = foot_step_;
 
     dcm_stabilizer_.com_measured_mpc_                   = com_measured_mpc_;
     dcm_stabilizer_.com_dot_measured_mpc_               = com_dot_measured_mpc_;
@@ -5571,6 +5570,10 @@ void AvatarController::sendingDataToStabilizer()
         dcm_stabilizer_.thread3_hz_                         = thread3_hz_;
         dcm_stabilizer_.w_                                  = w_;
         dcm_stabilizer_.t_total_const_mpc_                  = t_total_const_;
+        dcm_stabilizer_.t_dsp1_const_mpc_                   = t_dsp1_const_;
+        dcm_stabilizer_.t_dsp2_const_mpc_                   = t_dsp2_const_;
+
+        dcm_stabilizer_.t_temp_                             = t_temp_;
 
         dcm_stabilizer_.A_mpc_   = A_mpc_;
         dcm_stabilizer_.B_mpc_   = B_mpc_;
@@ -5587,6 +5590,9 @@ void AvatarController::sendingDataToStabilizer()
         dcm_stabilizer_.b_IS_plan_mpc_ = b_IS_plan_mpc_;
         dcm_stabilizer_.p_IS_step_mpc_ = p_IS_step_mpc_;
 
+        dcm_stabilizer_.step_enable_time_fwd_ = step_enable_time_fwd_;
+        dcm_stabilizer_.step_enable_time_bwd_ = step_enable_time_bwd_;
+        dcm_stabilizer_.step_enable_fix_time_pre_ = step_enable_fix_time_pre_;
         dcm_stabilizer_.step_time_adj_candidate_num_ = step_time_adj_candidate_num_;
     }
 
@@ -5642,6 +5648,9 @@ void AvatarController::receivingDataFromStabilizer()
     MPC_Stabilizer_delf_mpc_ = dcm_stabilizer_.MPC_Stabilizer_delf_mpc_;
     MPC_Stabilizer_delf_mpc_x_ = dcm_stabilizer_.MPC_Stabilizer_delf_mpc_x_;
     MPC_Stabilizer_delf_mpc_y_ = dcm_stabilizer_.MPC_Stabilizer_delf_mpc_y_;
+
+    fipm_planner_.MPC_Stabilizer_delf_mpc_x_ = dcm_stabilizer_.MPC_Stabilizer_delf_mpc_x_;
+    fipm_planner_.MPC_Stabilizer_delf_mpc_y_ = dcm_stabilizer_.MPC_Stabilizer_delf_mpc_y_;
 
     MPC_Stabilizer_alpha_mpc_ = dcm_stabilizer_.MPC_Stabilizer_alpha_mpc_;
     MPC_Stabilizer_aux_mpc_ = dcm_stabilizer_.MPC_Stabilizer_aux_mpc_;
@@ -5706,7 +5715,7 @@ void AvatarController::computeThread3()
         atb_main_to_mpc_update_ = true;
 
         MPC_first_loop_ = fipm_planner_.MPC_first_loop_ * dcm_stabilizer_.MPC_first_loop_;
-        
+
         dataFromContainerToMPC();
 
         sendingDataToPlanner();
@@ -5726,7 +5735,7 @@ void AvatarController::computeThread3()
     sendingDataToStabilizer();
 
     dcm_stabilizer_.IS_FIPM_3D_DCM_Stabilizer_MPC(thread3_hz_, preview_time);
-    //IS_FIPM_3D_DCM_Stabililzer_MPC(thread3_hz_, preview_time);
+
     receivingDataFromStabilizer();
 
     //send mpc data
@@ -5738,11 +5747,10 @@ void AvatarController::computeThread3()
 
         atb_mpc_to_main_update_ = false;
     }
+
     mpc_update_ = true;
 
     fipm_planner_.MPC_State_Step_Change();
-
-    econom2_thread_stepchange();
 
     std::chrono::steady_clock::time_point t3 = std::chrono::steady_clock::now();
 
@@ -7607,15 +7615,9 @@ void AvatarController::addZmpOffset()
 
     lfoot_zmp_offset_ = -0.02;
     rfoot_zmp_offset_ =  0.02;
-    
-    if(mpc_on_bool_)
-    {
-        lfoot_zmp_offset_ = -(0.035 - 0.005*(1 - (bool)current_step_num_));
-        rfoot_zmp_offset_ =  (0.035 - 0.005*(1 - (bool)current_step_num_));
 
-        lfoot_zmp_offset_ = -(0.045 - 0.015*(1 - (bool)current_step_num_));
-        rfoot_zmp_offset_ =  (0.045 - 0.015*(1 - (bool)current_step_num_));
-    }
+    lfoot_zmp_offset_ = -(0.04 - 0.015*(1 - (bool)current_step_num_));
+    rfoot_zmp_offset_ =  (0.04 - 0.015*(1 - (bool)current_step_num_));
     
     foot_step_support_frame_offset_ = foot_step_support_frame_;
 
@@ -8237,54 +8239,8 @@ void AvatarController::getFootTrajectory_stepping()
              
     desired_swing_foot(0) = target_swing_foot(0) + del_F_(0);
     desired_swing_foot(1) = target_swing_foot(1) + del_F_(1);
-    
-    if(walking_tick_ == t_start_)
-    {
-        foot_pos_compen_.setZero();
-    }
 
-    Eigen::Vector3d foot_pos_compen_calc; foot_pos_compen_calc.setZero();
-
-    if (foot_step_(current_step_num_, 6) == 1) // 왼발 지지
-    {
-        if(desired_swing_foot(0) < 0)
-        {
-            foot_pos_compen_calc(0) = desired_swing_foot(0) - zmp_x_min_foot_width_;
-        }
-        else
-        {
-            foot_pos_compen_calc(0) = desired_swing_foot(0) + zmp_x_max_foot_width_;
-        }
-        foot_pos_compen_calc(1) = desired_swing_foot(1) - zmp_y_min_foot_width_;
-        if((walking_tick_ > t_start_ + t_dsp1_ + 0.1*hz_) && (walking_tick_ < t_start_ + t_total_ - t_dsp2_ - 0.05*hz_))
-        {
-            foot_pos_compen_ = (lfoot_float_current_.linear().transpose()*foot_pos_compen_calc).transpose();
-        }
-    }
-    else
-    {
-        if(desired_swing_foot(0) < 0)
-        {
-            foot_pos_compen_calc(0) = desired_swing_foot(0) - zmp_x_min_foot_width_;
-        }
-        else
-        {
-            foot_pos_compen_calc(0) = desired_swing_foot(0) + zmp_x_max_foot_width_;
-        }
-        foot_pos_compen_calc(1) = desired_swing_foot(1) + zmp_y_max_foot_width_;
-        if((walking_tick_ > t_start_ + t_dsp1_ + 0.1*hz_) && (walking_tick_ < t_start_ + t_total_ - t_dsp2_ - 0.05*hz_))
-        {
-            foot_pos_compen_ = (rfoot_float_current_.linear().transpose()*foot_pos_compen_calc).transpose();
-        }
-    }
-
-    if(abs(del_F_(1)) > 1e-2)
-    {
-        target_swing_foot(2) = target_swing_foot(2) + 0.5*foot_pos_compen_(2);
-    }
-
-    double admittance_cubic_l_calc = 0.0;
-    double admittance_cubic_r_calc = 0.0;
+    foot_height_ = 0.055 + bool(abs(del_F_(0)) > 1e-2 || abs(del_F_(1)) > 1e-2)*0.045;
 
     double time_adj_tick_main_foot_traj;
     time_adj_tick_main_foot_traj = max(MPC_Stabilizer_time_adj_tick_x_main_, MPC_Stabilizer_time_adj_tick_y_main_);
@@ -8292,14 +8248,7 @@ void AvatarController::getFootTrajectory_stepping()
 
     double t_total_foot_traj_;
 
-    if(mpc_on_bool_)
-    {
-        t_total_foot_traj_ = t_total_const_ - time_adj_tick_main_foot_traj*hz_/thread3_hz_;
-    }
-    else
-    {
-        t_total_foot_traj_ = t_total_const_;
-    }
+    t_total_foot_traj_ = t_total_const_ - time_adj_tick_main_foot_traj*hz_/thread3_hz_;
 
     if (walking_tick_ < t_start_ + t_dsp1_)
     {
@@ -8309,7 +8258,8 @@ void AvatarController::getFootTrajectory_stepping()
             lfoot_trajectory_euler_support_.setZero();
 
             rfoot_trajectory_support_.translation() = rfoot_support_init_.translation();
-            rfoot_trajectory_euler_support_ = rfoot_support_euler_init_*DyrosMath::cubic(walking_tick_, t_start_, t_start_ + t_dsp1_, 1.0, 0.0, 0.0, 0.0);
+            rfoot_trajectory_support_.translation()(2) = 0;
+            rfoot_trajectory_euler_support_ = rfoot_support_euler_init_;
         }
         else if (foot_step_(current_step_num_, 6) == 0) // rfoot support, lfoot swing
         {
@@ -8317,7 +8267,8 @@ void AvatarController::getFootTrajectory_stepping()
             rfoot_trajectory_euler_support_.setZero();
 
             lfoot_trajectory_support_.translation() = lfoot_support_init_.translation();
-            lfoot_trajectory_euler_support_ = lfoot_support_euler_init_*DyrosMath::cubic(walking_tick_, t_start_, t_start_ + t_dsp1_, 1.0, 0.0, 0.0, 0.0);
+            lfoot_trajectory_support_.translation()(2) = 0;
+            lfoot_trajectory_euler_support_ = lfoot_support_euler_init_;
         }
 
         lfoot_trajectory_support_.linear() = DyrosMath::rotateWithZ(lfoot_trajectory_euler_support_(2)) 
@@ -8440,7 +8391,7 @@ void AvatarController::getFootTrajectory_stepping()
             Eigen::Vector3d temp;
             temp = DyrosMath::QuinticSpline(walking_tick_, t_start_ + t_dsp1_, t_start_ + t_total_foot_traj_ - t_dsp2_, lfoot_support_init_.translation()(0), 0.0, 0.0, desired_swing_foot(0), 0.0, 0.0);
             lfoot_trajectory_support_.translation()(0) = temp(0);
-            lfoot_trajectory_support_.translation()(1) = DyrosMath::cubic(walking_tick_, t_start_ + t_dsp1_, t_start_ + t_total_foot_traj_ - t_dsp2_, lfoot_support_init_.translation()(1), desired_swing_foot(1), 0.0, 0.0);    
+            lfoot_trajectory_support_.translation()(1) = DyrosMath::cubic(walking_tick_, t_start_ + t_dsp1_, t_start_ + t_total_foot_traj_ - t_dsp2_, lfoot_support_init_.translation()(1), desired_swing_foot(1), 0.0, 0.0);
 
             lfoot_trajectory_euler_support_.setZero();
             lfoot_trajectory_euler_support_(2) = DyrosMath::cubic(walking_tick_, t_start_ + t_dsp1_, t_start_ + t_total_foot_traj_ - t_dsp2_, lfoot_support_euler_init_(2), target_swing_foot(5), 0.0, 0.0);
@@ -8492,9 +8443,6 @@ void AvatarController::getFootTrajectory_stepping()
                                                * DyrosMath::rotateWithX(lfoot_trajectory_euler_support_(0) - F_T_L_x_input);
         }
     }
-
-    lfoot_trajectory_support_.translation()(2) = DyrosMath::minmax_cut(lfoot_trajectory_support_.translation()(2), -1e3, foot_height_);
-    rfoot_trajectory_support_.translation()(2) = DyrosMath::minmax_cut(rfoot_trajectory_support_.translation()(2), -1e3, foot_height_);
 }
 
 void AvatarController::preview_Parameter(double dt, int NL, Eigen::MatrixXd &Gi, Eigen::VectorXd &Gd, Eigen::MatrixXd &Gx, Eigen::MatrixXd &A, Eigen::VectorXd &B, Eigen::MatrixXd &C)
@@ -8874,7 +8822,6 @@ void AvatarController::getPelvTrajectory()
     double z_rot = foot_step_support_frame_(current_step_num_, 5);
 
     pelv_trajectory_support_.translation()(0) = pelv_support_current_.translation()(0) + 0.7 * (com_desired_(0) - com_support_current_(0));
-    //pelv_trajectory_support_.translation()(1) = pelv_support_current_.translation()(1) + 0.7 * (com_desired_(1) - com_support_current_(1));
     pelv_trajectory_support_.translation()(1) = pelv_support_current_.translation()(1) + 0.9 * (com_desired_(1) - com_support_current_(1));
     pelv_trajectory_support_.translation()(2) = pelv_support_current_.translation()(2) + 1.0 * (com_desired_(2) - com_support_current_(2));
 
@@ -8970,13 +8917,13 @@ void AvatarController::getComTrajectory_mpc()
         foot_step_support_frame_offset_mpc_              = foot_step_support_frame_offset_;
         foot_step_support_frame_offset_container_to_mpc_ = foot_step_support_frame_offset_;
 
-        //thread3_hz_ = 50.0;
         thread3_hz_ = 30.0;
 
         step_enable_time_fwd_ = 0.15;
         step_enable_time_bwd_ = 0.00;
-        step_enable_fix_time_pre_ = 3/thread3_hz_;
-        step_time_adj_candidate_num_ = (step_enable_time_fwd_ + step_enable_time_bwd_)*thread3_hz_ + 1;
+        step_enable_fix_time_pre_ = 1/thread3_hz_;
+        //step_time_adj_candidate_num_ = (step_enable_time_fwd_ + step_enable_time_bwd_)*thread3_hz_ + 1;
+        step_time_adj_candidate_num_ = 1;
 
         MPC_Stabilizer_delf_main_.setZero(2*step_time_adj_candidate_num_);
         MPC_Stabilizer_delf_main_(0*step_time_adj_candidate_num_) = foot_step_support_frame_(current_step_num_,0);
@@ -11284,16 +11231,16 @@ void AvatarController::parameterSetting()
     target_z_ = 0.0;
     com_height_ = 0.71;
     target_theta_ = 0.0;
-    step_length_x_ = 0.2;
+    step_length_x_ = 0.15;
     step_length_y_ = 0.0;
     is_right_foot_swing_ = 1;
     
-    t_dsp1_        = 0.10 * hz_;
-    t_dsp2_        = 0.10 * hz_;
+    t_dsp1_        = 0.15 * hz_;
+    t_dsp2_        = 0.15 * hz_;
     t_total_       = 0.9 * hz_;
 
-    t_dsp1_const_  = 0.10 * hz_;
-    t_dsp2_const_  = 0.10 * hz_;
+    t_dsp1_const_  = 0.15 * hz_;
+    t_dsp2_const_  = 0.15 * hz_;
     t_total_const_ = 0.9 * hz_;
 
     t_ssp_ = t_total_ - t_dsp1_ - t_dsp2_;
