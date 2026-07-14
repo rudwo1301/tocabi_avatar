@@ -500,17 +500,17 @@ void AvatarController::computeSlow()
 
             CAM_upper_init_q_(13) = 0.15;
 
-            CAM_upper_init_q_(15) = + 15.0 * DEG2RAD; // Left Shoulder Yaw joint // 17 deg
-            CAM_upper_init_q_(16) = + 10.0 * DEG2RAD; // Left Shoulder Pitch joint // 17 deg
-            CAM_upper_init_q_(17) = + 65.0 * DEG2RAD; // Left Shoulder Roll joint // 86 deg
-            CAM_upper_init_q_(18) = - 70.0 * DEG2RAD; // Left Elbow Yaw joint // -72 deg
-            CAM_upper_init_q_(19) = - 65.0 * DEG2RAD; // Left Elbow Pitch joint // -57 deg
+            //CAM_upper_init_q_(15) = + 15.0 * DEG2RAD; // Left Shoulder Yaw joint // 17 deg
+            //CAM_upper_init_q_(16) = + 10.0 * DEG2RAD; // Left Shoulder Pitch joint // 17 deg
+            //CAM_upper_init_q_(17) = + 65.0 * DEG2RAD; // Left Shoulder Roll joint // 86 deg
+            //CAM_upper_init_q_(18) = - 70.0 * DEG2RAD; // Left Elbow Yaw joint // -72 deg
+            //CAM_upper_init_q_(19) = - 65.0 * DEG2RAD; // Left Elbow Pitch joint // -57 deg
 
-            CAM_upper_init_q_(25) = - 15.0 * DEG2RAD; // Right Shoulder Yaw joint // -17 deg
-            CAM_upper_init_q_(26) = - 10.0 * DEG2RAD; // Right Shoulder Pitch joint           
-            CAM_upper_init_q_(27) = - 65.0 * DEG2RAD; // Right Shoulder Roll joint 
-            CAM_upper_init_q_(28) = + 70.0 * DEG2RAD; // Right Elbow Yaw joint
-            CAM_upper_init_q_(29) = + 65.0 * DEG2RAD; // Right Elbow Pich joint                       
+            //CAM_upper_init_q_(25) = - 15.0 * DEG2RAD; // Right Shoulder Yaw joint // -17 deg
+            //CAM_upper_init_q_(26) = - 10.0 * DEG2RAD; // Right Shoulder Pitch joint           
+            //CAM_upper_init_q_(27) = - 65.0 * DEG2RAD; // Right Shoulder Roll joint 
+            //CAM_upper_init_q_(28) = + 70.0 * DEG2RAD; // Right Elbow Yaw joint
+            //CAM_upper_init_q_(29) = + 65.0 * DEG2RAD; // Right Elbow Pich joint                       
             
             q_prev_MJ_ = rd_.q_;
             walking_tick_ = 0;
@@ -746,6 +746,8 @@ void AvatarController::computeSlow()
         }
 
         desired_q_fast_(12) = ref_q_(0);
+        desired_q_fast_(16) = ref_q_(0) + Initial_ref_upper_q_(16);
+        desired_q_fast_(26) = ref_q_(0) + Initial_ref_upper_q_(26);
 
         torque_upper_.setZero();
         for (int i = 12; i < MODEL_DOF; i++)
@@ -8834,7 +8836,7 @@ void AvatarController::getPelvTrajectory()
     Trunk_trajectory_calc = DyrosMath::cubic(walking_tick_, t_start_, 
                                                             t_start_ + t_total_,
                                                             (  pelv_rot_deg - (1*pelv_rot_deg + pelv_rot_deg*(bool)current_step_num_)*foot_step_(current_step_num_, 6))*DEG2RAD,
-                                                            (- pelv_rot_deg +  2*pelv_rot_deg                                        *foot_step_(current_step_num_, 6))*DEG2RAD,
+                                                            (- pelv_rot_deg + pelv_rot_deg*(bool)(current_step_num_ == total_step_num_ - 1) + (2*pelv_rot_deg)*foot_step_(current_step_num_, 6))*DEG2RAD,
                                                             0.0,
                                                             0.0);
 

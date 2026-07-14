@@ -352,8 +352,8 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
                 next_step_prev_bool       = (bool)(mpc_tick + mpc_synchro_hz*(i + 1) > ((1 - (bool)(current_step_num_mpc_))*t_temp_ + (j + 1)*t_total_mpc_ - t_dsp2_const_mpc_));
             }
 
-            if((walking_tick_mpc_ > t_temp_ - (t_dsp2_const_mpc_ + step_enable_fix_time_pre_*hz_)) && (next_step_start_prev_tick < N_stab_mpc))
-            //if(0)
+            //if((walking_tick_mpc_ > t_temp_ - (t_dsp2_const_mpc_ + step_enable_fix_time_pre_*hz_)) && (next_step_start_prev_tick < N_stab_mpc))
+            if(0)
             {
                 Sf1_stab_mpc_(i,0) = step_enable_bool_mpc_* next_step_prev_bool*(zmp_max_y_mpc_(i) - zmp_max_y_mpc_(int(t_dsp1_const_mpc_/mpc_synchro_hz)))/(MPC_Stabilizer_delf_mpc_y_(0));
                 if(walking_tick_mpc_ < t_temp_)

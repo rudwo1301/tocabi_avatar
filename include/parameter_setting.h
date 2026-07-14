@@ -12,17 +12,17 @@ class parameterSettingConstructor
         double target_z_ = 0.0;
         double com_height_ = 0.71;
         double target_theta_ = 0.0;
-        double step_length_x_ = 0.20;
+        double step_length_x_ = 0.25;
         double step_length_y_ = 0.0;
         int    is_right_foot_swing_ = 1;
     
-        double t_dsp1_        = 0.15 * hz_;
-        double t_dsp2_        = 0.15 * hz_;
-        double t_total_       = 0.9 * hz_;
+        double t_dsp1_        = 0.10 * hz_;
+        double t_dsp2_        = 0.10 * hz_;
+        double t_total_       = 0.8 * hz_;
 
-        double t_dsp1_const_  = 0.15 * hz_;
-        double t_dsp2_const_  = 0.15 * hz_;
-        double t_total_const_ = 0.9 * hz_;
+        double t_dsp1_const_  = 0.10 * hz_;
+        double t_dsp2_const_  = 0.10 * hz_;
+        double t_total_const_ = 0.8 * hz_;
 
         double t_ssp_ = t_total_ - t_dsp1_ - t_dsp2_;
         double foot_height_ = 0.055;
