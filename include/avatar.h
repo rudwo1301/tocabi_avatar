@@ -30,6 +30,7 @@
 
 #include "fipm_planner.h"
 #include "dcm_stabilizer.h"
+#include "parameter_setting.h"
 
 const std::string calibration_folder_dir_ = "/home/dyros/data/vive_tracker/calibration_log/dh";  //tocabi 
 
@@ -55,6 +56,7 @@ public:
 
     fipmPlanner fipm_planner_;
     dcmStabilizer dcm_stabilizer_;
+    parameterSettingConstructor parameter_setting_;
 
     ros::NodeHandle nh_avatar_;
     ros::CallbackQueue queue_avatar_;

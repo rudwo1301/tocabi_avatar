@@ -106,6 +106,9 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
         Qmat_stab_mpc_R_.resize(N_stab_mpc, N_stab_mpc); //VRP
         Qmat_stab_mpc_R_.setIdentity();
 
+        Qmat_stab_mpc_alp_.resize(step_time_adj_candidate_num_, step_time_adj_candidate_num_);
+        Qmat_stab_mpc_alp_.setIdentity();
+
         Qcalc_stab_mpc_.setZero(input_num, input_num);
 
         gcalc_stab_mpc_.setZero(input_num, 1);
@@ -193,7 +196,9 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
                                                     +SUpz_stab_mpc_.transpose()*(Pdpu_stab_mpc_.transpose()*Q_dcm_z*MatrixXd::Identity(N_stab_mpc, N_stab_mpc)*Pdpu_stab_mpc_ + R_dcm_z*Qmat_stab_mpc_R_)*SUpz_stab_mpc_)*SUp_stab_mpc_
                                                     
                         + SUf_stab_mpc_.transpose()*(SUfx_stab_mpc_.transpose()*R_df_x*SUfx_stab_mpc_
-                                                   + SUfy_stab_mpc_.transpose()*R_df_y*SUfy_stab_mpc_)*SUf_stab_mpc_;
+                                                   + SUfy_stab_mpc_.transpose()*R_df_y*SUfy_stab_mpc_)*SUf_stab_mpc_
+                                                   
+                        + SUalpha_stab_mpc_.transpose()*R_dalp*Qmat_stab_mpc_alp_*SUalpha_stab_mpc_;
 
         gxpcalc_stab_mpc_ = SUp_stab_mpc_.transpose()*SUpx_stab_mpc_.transpose()*Pdpu_stab_mpc_.transpose()*Q_dcm_x*MatrixXd::Identity(N_stab_mpc, N_stab_mpc);
         gypcalc_stab_mpc_ = SUp_stab_mpc_.transpose()*SUpy_stab_mpc_.transpose()*Pdpu_stab_mpc_.transpose()*Q_dcm_y*MatrixXd::Identity(N_stab_mpc, N_stab_mpc);
@@ -202,6 +207,7 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
         gxdfcalc_stab_mpc_ = SUf_stab_mpc_.transpose()*SUfx_stab_mpc_.transpose()*R_df_x;
         gydfcalc_stab_mpc_ = SUf_stab_mpc_.transpose()*SUfy_stab_mpc_.transpose()*R_df_y;
 
+        gdalpcalc_stab_mpc_ = SUalpha_stab_mpc_.transpose()*R_dalp*Qmat_stab_mpc_alp_;
 
         Sf1_stab_mpc_.setZero(N_stab_mpc, step_time_adj_candidate_num_);
 
@@ -390,7 +396,9 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
                      +gzpcalc_stab_mpc_  *(Pdps_stab_mpc_*ssz_stab_mpc_*MPC_Stabilizer_state_mpc_ - dcm_refz)
                      
                      +gxdfcalc_stab_mpc_ *(                                                       - MPC_Stabilizer_delf_mpc_x_)
-                     +gydfcalc_stab_mpc_ *(                                                       - MPC_Stabilizer_delf_mpc_y_);;
+                     +gydfcalc_stab_mpc_ *(                                                       - MPC_Stabilizer_delf_mpc_y_)
+                     
+                     +gdalpcalc_stab_mpc_*(                                                       - MPC_Stabilizer_alpha_mpc_);
 
     SQP_deldel_Qcalc_stab_mpc_ = Qcalc_stab_mpc_;
 
@@ -434,7 +442,7 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
             {
                 const_SQP_phi_mpc_ = IS_FIPM_SQP_x_phi1_N_stab_mpc_.block(calc_index, 0, input_num, input_num)
                 
-                                   + IS_FIPM_SQP_x_phi2_N_stab_mpc_.block(calc_index, 0, input_num, N_stab_mpc)*Sf1_stab_mpc_*SUfx_stab_mpc_*SUf_stab_mpc_;
+                                   + IS_FIPM_SQP_x_phi2_N_stab_mpc_.block(calc_index, 0, input_num, N_stab_mpc)*Sf1_stab_mpc_*SUauxx_stab_mpc_*SUaux_stab_mpc_;
 
                 const_SQP_phi_mpc_calc_ = 0.5*(const_SQP_phi_mpc_ + const_SQP_phi_mpc_.transpose());
 
@@ -446,9 +454,9 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
 
                                    - zmp_max_x_mpc_(i)*IS_FIPM_SQP_x_pi3_N_stab_mpc_.block(calc_index, 0, input_num, 1)
                                    
-                                   + (MPC_Stabilizer_state_mpc_.transpose()*IS_FIPM_SQP_x_pi4_N_stab_mpc_.block(calc_index2, 0, 3*N_state, N_stab_mpc)*Sf1_stab_mpc_*SUfx_stab_mpc_*SUf_stab_mpc_).transpose()
+                                   + (MPC_Stabilizer_state_mpc_.transpose()*IS_FIPM_SQP_x_pi4_N_stab_mpc_.block(calc_index2, 0, 3*N_state, N_stab_mpc)*Sf1_stab_mpc_*SUauxx_stab_mpc_*SUaux_stab_mpc_).transpose()
                                    
-                                   - (((GRAVITY*b_*b_)*MatrixXd::Identity(1,1)).transpose()*Sf1_stab_mpc_.row(i)*SUfx_stab_mpc_*SUf_stab_mpc_).transpose();
+                                   - (((GRAVITY*b_*b_)*MatrixXd::Identity(1,1)).transpose()*Sf1_stab_mpc_.row(i)*SUauxx_stab_mpc_*SUaux_stab_mpc_).transpose();
             
                 IS_FIPM_SQP_x_pi_max_vec.push_back(const_SQP_pi_mpc_);
 
@@ -477,7 +485,7 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
             {
                 const_SQP_phi_mpc_ = IS_FIPM_SQP_x_phi1_N_stab_mpc_.block(calc_index, 0, input_num, input_num)
 
-                                   + IS_FIPM_SQP_x_phi2_N_stab_mpc_.block(calc_index, 0, input_num, N_stab_mpc)*Sf1_stab_mpc_*SUfx_stab_mpc_*SUf_stab_mpc_;
+                                   + IS_FIPM_SQP_x_phi2_N_stab_mpc_.block(calc_index, 0, input_num, N_stab_mpc)*Sf1_stab_mpc_*SUauxx_stab_mpc_*SUaux_stab_mpc_;
 
                 const_SQP_phi_mpc_calc_ = 0.5*(const_SQP_phi_mpc_ + const_SQP_phi_mpc_.transpose());
 
@@ -489,9 +497,9 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
 
                                - zmp_min_x_mpc_(i)*IS_FIPM_SQP_x_pi3_N_stab_mpc_.block(calc_index, 0, input_num, 1)
                                
-                               + (MPC_Stabilizer_state_mpc_.transpose()*IS_FIPM_SQP_x_pi4_N_stab_mpc_.block(calc_index2, 0, 3*N_state, N_stab_mpc)*Sf1_stab_mpc_*SUfx_stab_mpc_*SUf_stab_mpc_).transpose()
+                               + (MPC_Stabilizer_state_mpc_.transpose()*IS_FIPM_SQP_x_pi4_N_stab_mpc_.block(calc_index2, 0, 3*N_state, N_stab_mpc)*Sf1_stab_mpc_*SUauxx_stab_mpc_*SUaux_stab_mpc_).transpose()
                                    
-                               - (((GRAVITY*b_*b_)*MatrixXd::Identity(1,1)).transpose()*Sf1_stab_mpc_.row(i)*SUfx_stab_mpc_*SUf_stab_mpc_).transpose();
+                               - (((GRAVITY*b_*b_)*MatrixXd::Identity(1,1)).transpose()*Sf1_stab_mpc_.row(i)*SUauxx_stab_mpc_*SUaux_stab_mpc_).transpose();
 
                 IS_FIPM_SQP_x_pi_min_vec.push_back(const_SQP_pi_mpc_);
 
@@ -520,7 +528,7 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
             {
                 const_SQP_phi_mpc_ = IS_FIPM_SQP_y_phi1_N_stab_mpc_.block(calc_index, 0, input_num, input_num)
                 
-                                   + IS_FIPM_SQP_y_phi2_N_stab_mpc_.block(calc_index, 0, input_num, N_stab_mpc)*Sf1_stab_mpc_*SUfy_stab_mpc_*SUf_stab_mpc_;
+                                   + IS_FIPM_SQP_y_phi2_N_stab_mpc_.block(calc_index, 0, input_num, N_stab_mpc)*Sf1_stab_mpc_*SUauxy_stab_mpc_*SUaux_stab_mpc_;
 
                 const_SQP_phi_mpc_calc_ = 0.5*(const_SQP_phi_mpc_ + const_SQP_phi_mpc_.transpose());
 
@@ -532,9 +540,9 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
 
                                    - zmp_max_y_mpc_step_calc(i)*IS_FIPM_SQP_y_pi3_N_stab_mpc_.block(calc_index, 0, input_num, 1)
                                    
-                                   + (MPC_Stabilizer_state_mpc_.transpose()*IS_FIPM_SQP_y_pi4_N_stab_mpc_.block(calc_index2, 0, 3*N_state, N_stab_mpc)*Sf1_stab_mpc_*SUfy_stab_mpc_*SUf_stab_mpc_).transpose()
+                                   + (MPC_Stabilizer_state_mpc_.transpose()*IS_FIPM_SQP_y_pi4_N_stab_mpc_.block(calc_index2, 0, 3*N_state, N_stab_mpc)*Sf1_stab_mpc_*SUauxy_stab_mpc_*SUaux_stab_mpc_).transpose()
                                    
-                                   - (((GRAVITY*b_*b_)*MatrixXd::Identity(1,1)).transpose()*Sf1_stab_mpc_.row(i)*SUfy_stab_mpc_*SUf_stab_mpc_).transpose();
+                                   - (((GRAVITY*b_*b_)*MatrixXd::Identity(1,1)).transpose()*Sf1_stab_mpc_.row(i)*SUauxy_stab_mpc_*SUaux_stab_mpc_).transpose();
 
                 IS_FIPM_SQP_y_pi_max_vec.push_back(const_SQP_pi_mpc_);
 
@@ -563,7 +571,7 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
             {
                 const_SQP_phi_mpc_ = IS_FIPM_SQP_y_phi1_N_stab_mpc_.block(calc_index, 0, input_num, input_num)
                 
-                                   + IS_FIPM_SQP_y_phi2_N_stab_mpc_.block(calc_index, 0, input_num, N_stab_mpc)*Sf1_stab_mpc_*SUfy_stab_mpc_*SUf_stab_mpc_;
+                                   + IS_FIPM_SQP_y_phi2_N_stab_mpc_.block(calc_index, 0, input_num, N_stab_mpc)*Sf1_stab_mpc_*SUauxy_stab_mpc_*SUaux_stab_mpc_;
                 
                 const_SQP_phi_mpc_calc_ = 0.5*(const_SQP_phi_mpc_ + const_SQP_phi_mpc_.transpose());
 
@@ -575,9 +583,9 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
 
                                    - zmp_min_y_mpc_step_calc(i)*IS_FIPM_SQP_y_pi3_N_stab_mpc_.block(calc_index, 0, input_num, 1)
                                    
-                                   + (MPC_Stabilizer_state_mpc_.transpose()*IS_FIPM_SQP_y_pi4_N_stab_mpc_.block(calc_index2, 0, 3*N_state, N_stab_mpc)*Sf1_stab_mpc_*SUfy_stab_mpc_*SUf_stab_mpc_).transpose()
+                                   + (MPC_Stabilizer_state_mpc_.transpose()*IS_FIPM_SQP_y_pi4_N_stab_mpc_.block(calc_index2, 0, 3*N_state, N_stab_mpc)*Sf1_stab_mpc_*SUauxy_stab_mpc_*SUaux_stab_mpc_).transpose()
                                    
-                                   - (((GRAVITY*b_*b_)*MatrixXd::Identity(1,1)).transpose()*Sf1_stab_mpc_.row(i)*SUfy_stab_mpc_*SUf_stab_mpc_).transpose();
+                                   - (((GRAVITY*b_*b_)*MatrixXd::Identity(1,1)).transpose()*Sf1_stab_mpc_.row(i)*SUauxy_stab_mpc_*SUaux_stab_mpc_).transpose();
                                
                 IS_FIPM_SQP_y_pi_min_vec.push_back(const_SQP_pi_mpc_);
 
@@ -675,6 +683,44 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
         const_lb_mpc_.block(constraint_index, 0, 1, 1)         = - SUfy_stab_mpc_*SUf_stab_mpc_*MPC_Stabilizer_u_mpc_ + delf_y_min_calc*MatrixXd::Ones(1,1);
         constraint_index += 1;
         
+        //alpha min max
+        const_A_mpc_.block (constraint_index, 0, step_time_adj_candidate_num_, input_num) =   SUalpha_stab_mpc_;
+        const_ub_mpc_.block(constraint_index, 0, step_time_adj_candidate_num_, 1)         = - SUalpha_stab_mpc_*MPC_Stabilizer_u_mpc_ + MatrixXd::Ones(step_time_adj_candidate_num_, 1);
+        const_lb_mpc_.block(constraint_index, 0, step_time_adj_candidate_num_, 1)         = - SUalpha_stab_mpc_*MPC_Stabilizer_u_mpc_ + MatrixXd::Zero(step_time_adj_candidate_num_, 1);
+        constraint_index += step_time_adj_candidate_num_;
+
+        //alpha sum
+        const_A_mpc_.block (constraint_index, 0, 1, input_num) =   MatrixXd::Ones(1, step_time_adj_candidate_num_)*SUalpha_stab_mpc_;
+        const_ub_mpc_.block(constraint_index, 0, 1, 1)         = - MatrixXd::Ones(1, step_time_adj_candidate_num_)*SUalpha_stab_mpc_*MPC_Stabilizer_u_mpc_ + MatrixXd::Ones(1,1);
+        const_lb_mpc_.block(constraint_index, 0, 1, 1)         = - MatrixXd::Ones(1, step_time_adj_candidate_num_)*SUalpha_stab_mpc_*MPC_Stabilizer_u_mpc_ + MatrixXd::Ones(1,1);
+        constraint_index += 1;
+
+        //alpha delf aux
+        for(int i = 0; i < step_time_adj_candidate_num_; i++)
+        {
+            const_SQP_phi_mpc_ = SUalpha_stab_mpc_.row(i).transpose()*SUfx_stab_mpc_*SUf_stab_mpc_;
+            const_SQP_phi_mpc_calc_ = 0.5*(const_SQP_phi_mpc_ + const_SQP_phi_mpc_.transpose());
+            const_SQP_pi_mpc_  = (- SUauxx_stab_mpc_.row(i)*SUaux_stab_mpc_).transpose();
+            const_SQP_ri_mpc_.setZero(1,1);
+            const_SQP_hi_mpc_ = MPC_Stabilizer_u_mpc_.transpose()*const_SQP_phi_mpc_calc_*MPC_Stabilizer_u_mpc_ + const_SQP_pi_mpc_.transpose()*MPC_Stabilizer_u_mpc_ + const_SQP_ri_mpc_;
+
+            const_A_mpc_.row(constraint_index) = (2*const_SQP_phi_mpc_calc_*MPC_Stabilizer_u_mpc_ + const_SQP_pi_mpc_).transpose();
+            const_ub_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+            const_lb_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+            constraint_index += 1;
+
+            const_SQP_phi_mpc_ = SUalpha_stab_mpc_.row(i).transpose()*SUfy_stab_mpc_*SUf_stab_mpc_;
+            const_SQP_phi_mpc_calc_ = 0.5*(const_SQP_phi_mpc_ + const_SQP_phi_mpc_.transpose());
+            const_SQP_pi_mpc_  = (- SUauxy_stab_mpc_.row(i)*SUaux_stab_mpc_).transpose();
+            const_SQP_ri_mpc_.setZero(1,1);
+            const_SQP_hi_mpc_ = MPC_Stabilizer_u_mpc_.transpose()*const_SQP_phi_mpc_calc_*MPC_Stabilizer_u_mpc_ + const_SQP_pi_mpc_.transpose()*MPC_Stabilizer_u_mpc_ + const_SQP_ri_mpc_;
+
+            const_A_mpc_.row(constraint_index) = (2*const_SQP_phi_mpc_calc_*MPC_Stabilizer_u_mpc_ + const_SQP_pi_mpc_).transpose();
+            const_ub_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+            const_lb_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+            constraint_index += 1;
+        }
+
         QP_MPC_Stabilizer_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
 
         if(QP_MPC_Stabilizer_.SolveQPoases(100, MPC_Stabilizer_SQP_du_mpc_))

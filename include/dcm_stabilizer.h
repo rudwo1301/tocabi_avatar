@@ -100,6 +100,7 @@ class dcmStabilizer
 
         Eigen::MatrixXd Qmat_stab_mpc_Q_;
         Eigen::MatrixXd Qmat_stab_mpc_R_;
+        Eigen::MatrixXd Qmat_stab_mpc_alp_;
 
         Eigen::MatrixXd Qcalc_stab_mpc_;
 
@@ -110,6 +111,8 @@ class dcmStabilizer
 
         Eigen::MatrixXd gxdfcalc_stab_mpc_;
         Eigen::MatrixXd gydfcalc_stab_mpc_;
+
+        Eigen::MatrixXd gdalpcalc_stab_mpc_;
 
         Eigen::VectorXd MPC_Stabilizer_u_mpc_;
         Eigen::VectorXd MPC_Stabilizer_SQP_du_mpc_;

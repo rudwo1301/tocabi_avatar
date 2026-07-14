@@ -745,6 +745,8 @@ void AvatarController::computeSlow()
             atb_desired_q_update_ = false;
         }
 
+        desired_q_fast_(12) = ref_q_(0);
+
         torque_upper_.setZero();
         for (int i = 12; i < MODEL_DOF; i++)
         {
@@ -7613,11 +7615,8 @@ void AvatarController::addZmpOffset()
 {
     double lfoot_zmp_offset_, rfoot_zmp_offset_;
 
-    lfoot_zmp_offset_ = -0.02;
-    rfoot_zmp_offset_ =  0.02;
-
-    lfoot_zmp_offset_ = -(0.04 - 0.015*(1 - (bool)current_step_num_));
-    rfoot_zmp_offset_ =  (0.04 - 0.015*(1 - (bool)current_step_num_));
+    lfoot_zmp_offset_ = -(parameter_setting_.lfoot_zmp_offset_ - parameter_setting_.zmp_offset_first_*(1 - (bool)current_step_num_));
+    rfoot_zmp_offset_ =  (parameter_setting_.rfoot_zmp_offset_ - parameter_setting_.zmp_offset_first_*(1 - (bool)current_step_num_));
     
     foot_step_support_frame_offset_ = foot_step_support_frame_;
 
@@ -8828,27 +8827,24 @@ void AvatarController::getPelvTrajectory()
     Eigen::Vector3d Trunk_trajectory_euler;
     Trunk_trajectory_euler.setZero();
 
-    if (walking_tick_ < t_start_ + t_dsp1_)
-    {
-        Trunk_trajectory_euler(2) = pelv_support_euler_init_(2);
-    }
-    else if (walking_tick_ >= t_start_ + t_dsp1_ && walking_tick_ < t_start_ + t_total_ - t_dsp2_)
-    {
-        Trunk_trajectory_euler(2) = DyrosMath::cubic(walking_tick_, t_start_ + t_dsp1_, t_start_ + t_total_ - t_dsp2_, pelv_support_euler_init_(2), z_rot / 2.0, 0.0, 0.0);
-    }
-    else
-    {
-        Trunk_trajectory_euler(2) = z_rot / 2.0;
-    }
+    Trunk_trajectory_euler(2) = DyrosMath::cubic(walking_tick_, t_start_ + t_dsp1_, t_start_ + t_total_ - t_dsp2_, pelv_support_euler_init_(2), z_rot / 2.0, 0.0, 0.0);
+    double Trunk_trajectory_calc;
+    double pelv_rot_deg = parameter_setting_.pelv_rot_deg_;
+    
+    Trunk_trajectory_calc = DyrosMath::cubic(walking_tick_, t_start_, 
+                                                            t_start_ + t_total_,
+                                                            (  pelv_rot_deg - (1*pelv_rot_deg + pelv_rot_deg*(bool)current_step_num_)*foot_step_(current_step_num_, 6))*DEG2RAD,
+                                                            (- pelv_rot_deg +  2*pelv_rot_deg                                        *foot_step_(current_step_num_, 6))*DEG2RAD,
+                                                            0.0,
+                                                            0.0);
+
+    Trunk_trajectory_euler(2) = bool(walking_tick_ > t_temp_) * (Trunk_trajectory_calc);
 
     if (aa == 0 && walking_tick_ == 0 && (walking_enable_ == true))
     {
         P_angle_input = 0;
         R_angle_input = 0;
     }
-
-    //P_angle_input_dot = 2.25 * (0.0 - P_angle) + 0.5 * (0.0 - rd_.link_[Pelvis].w(0));
-    //R_angle_input_dot = 2.25 * (0.0 - R_angle) + 0.5 * (0.0 - rd_.link_[Pelvis].w(1));
 
     P_angle_input_dot = 1.5 * (0.0 - P_angle);
     R_angle_input_dot = 2.0 * (0.0 - R_angle);
@@ -8923,7 +8919,7 @@ void AvatarController::getComTrajectory_mpc()
         step_enable_time_bwd_ = 0.00;
         step_enable_fix_time_pre_ = 1/thread3_hz_;
         //step_time_adj_candidate_num_ = (step_enable_time_fwd_ + step_enable_time_bwd_)*thread3_hz_ + 1;
-        step_time_adj_candidate_num_ = 1;
+        step_time_adj_candidate_num_ = 3;
 
         MPC_Stabilizer_delf_main_.setZero(2*step_time_adj_candidate_num_);
         MPC_Stabilizer_delf_main_(0*step_time_adj_candidate_num_) = foot_step_support_frame_(current_step_num_,0);
@@ -11226,34 +11222,35 @@ void AvatarController::GravityCalculate_MJ()
 
 void AvatarController::parameterSetting()
 {       
-    target_x_ = 0.0;
-    target_y_ = 0.0;
-    target_z_ = 0.0;
-    com_height_ = 0.71;
-    target_theta_ = 0.0;
-    step_length_x_ = 0.15;
-    step_length_y_ = 0.0;
-    is_right_foot_swing_ = 1;
-    
-    t_dsp1_        = 0.15 * hz_;
-    t_dsp2_        = 0.15 * hz_;
-    t_total_       = 0.9 * hz_;
+    target_x_            = parameter_setting_.target_x_;
+    target_y_            = parameter_setting_.target_y_;
+    target_z_            = parameter_setting_.target_z_;
+    com_height_          = parameter_setting_.com_height_;
+    target_theta_        = parameter_setting_.target_theta_;
+    step_length_x_       = parameter_setting_.step_length_x_;
+    step_length_y_       = parameter_setting_.step_length_y_;
+    is_right_foot_swing_ = parameter_setting_.is_right_foot_swing_;
 
-    t_dsp1_const_  = 0.15 * hz_;
-    t_dsp2_const_  = 0.15 * hz_;
-    t_total_const_ = 0.9 * hz_;
+    t_dsp1_              = parameter_setting_.t_dsp1_;
+    t_dsp2_              = parameter_setting_.t_dsp2_;
+    t_total_             = parameter_setting_.t_total_;
 
-    t_ssp_ = t_total_ - t_dsp1_ - t_dsp2_;
-    //foot_width_  = zmp_y_max;
-    foot_width_  = zmp_y_max_foot_width_;
-    foot_height_ = 0.055;
+    t_dsp1_const_        = parameter_setting_.t_dsp1_const_;
+    t_dsp2_const_        = parameter_setting_.t_dsp2_const_;
+    t_total_const_       = parameter_setting_.t_total_const_;
 
-    t_temp_ = 3.0 * hz_;
-    t_last_ = t_total_ + t_temp_;
-    t_start_ = t_temp_ + 1;
+    t_ssp_               = parameter_setting_.t_ssp_;
+
+    foot_width_          = zmp_y_max_foot_width_;
+
+    foot_height_         = parameter_setting_.foot_height_;
+
+    t_temp_              = parameter_setting_.t_temp_;
+
+    t_last_              = t_total_ + t_temp_;
+    t_start_             = t_temp_ + 1;
 
     current_step_num_ = 0;
-    pelv_height_offset_ = 0.0; // change pelvis height for manipulation when the robot stop walking
 }
 
 void AvatarController::updateNextStepTime()
