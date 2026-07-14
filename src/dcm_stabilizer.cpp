@@ -38,7 +38,7 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
 {
     double Q_dcm_x, Q_dcm_y, Q_dcm_z, R_dcm_x, R_dcm_y, R_dcm_z, R_dalp, R_df_x, R_df_y;
 
-    Q_dcm_x = 1e-0; R_dcm_x = 1e-2; R_dalp = 1e+1; R_df_x = 1e-0;
+    Q_dcm_x = 1e-0; R_dcm_x = 1e-1; R_dalp = 1e+1; R_df_x = 1e-0;
     Q_dcm_y = 1e-0; R_dcm_y = 1e-2;                R_df_y = 1e+2; //need tuning 1e+2 - 1e+3
     Q_dcm_z = 9e-1; R_dcm_z = 1e-1; //for 0.9 step time
 

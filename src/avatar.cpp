@@ -7036,11 +7036,14 @@ void AvatarController::calculateFootStepTotal_MJ()
     unsigned int middle_total_step_number = length_to_target / dlength;
     double middle_residual_length = length_to_target - middle_total_step_number * dlength;
 
-    double step_width_init;
-    double step_width;
+    double step_width_init = 0.0;
+    double step_width = 0.0;
 
-    step_width_init = 0.01;
-    step_width = 0.02;
+    if(target_theta_ != 0)
+    {
+        step_width_init = 0.01;
+        step_width = 0.02;
+    }
 
     if (length_to_target == 0.0)
     {

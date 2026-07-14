@@ -29,8 +29,8 @@ class parameterSettingConstructor
 
         double t_temp_ = 3.0 * hz_;
 
-        double lfoot_zmp_offset_ = 0.050;
-        double rfoot_zmp_offset_ = 0.050;
+        double lfoot_zmp_offset_ = 0.065;
+        double rfoot_zmp_offset_ = 0.065;
         double zmp_offset_first_ = 0.015;
 
         //double pelv_rot_deg_ = 5.0;
