@@ -9,7 +9,7 @@ extern std::vector<std::ofstream> e_stabilizer_data_txt_;
 class dcmStabilizer
 {
     public:
-        static const int num_ofstream = 10;
+        static const int num_ofstream = 20;
 
         dcmStabilizer();
 

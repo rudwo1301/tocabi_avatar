@@ -7,7 +7,7 @@ class parameterSettingConstructor
         parameterSettingConstructor();
 
         double hz_ = 2000.0;
-        double target_x_ = 10.0;
+        double target_x_ = 0.0;
         double target_y_ = 0.0;
         double target_z_ = 0.0;
         double com_height_ = 0.71;

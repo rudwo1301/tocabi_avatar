@@ -859,11 +859,16 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
     data_save_calc << zmp_min_y_mpc_step_calc, zmp_max_y_mpc_step_calc, 0*zmp_max_y_mpc_step_calc;
     e_stabilizer_data_txt_[6] << data_save_calc.transpose() << endl;
 
+    data_save_calc << zmp_min_x_mpc_, zmp_max_x_mpc_, 0*zmp_max_x_mpc_;
+    e_stabilizer_data_txt_[7] << data_save_calc.transpose() << endl;
+    data_save_calc << zmp_min_y_mpc_, zmp_max_y_mpc_, 0*zmp_max_y_mpc_;
+    e_stabilizer_data_txt_[8] << data_save_calc.transpose() << endl;
+
     data_save_calc.setZero(1*step_time_adj_candidate_num_);
     data_save_calc << MPC_Stabilizer_alpha_mpc_;
-    e_stabilizer_data_txt_[7] << data_save_calc.transpose() << endl;
+    e_stabilizer_data_txt_[9] << data_save_calc.transpose() << endl;
 
     data_save_calc.setZero(2*step_time_adj_candidate_num_);
     data_save_calc << MPC_Stabilizer_aux_mpc_x_, MPC_Stabilizer_aux_mpc_y_;
-    e_stabilizer_data_txt_[8] << data_save_calc.transpose() << endl;
+    e_stabilizer_data_txt_[10] << data_save_calc.transpose() << endl;
 }
