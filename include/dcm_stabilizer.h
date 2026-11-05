@@ -17,6 +17,7 @@ class dcmStabilizer
         void ofstream_open();
         void ofstream_close();
         void IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_preview_window);
+        void MPC_State_Step_Change();
 
         //variables
         //walking parameters
@@ -126,6 +127,9 @@ class dcmStabilizer
         Eigen::VectorXd MPC_Stabilizer_delf_mpc_;
         Eigen::VectorXd MPC_Stabilizer_delf_mpc_x_;
         Eigen::VectorXd MPC_Stabilizer_delf_mpc_y_;
+
+        int MPC_Stabilizer_time_adj_tick_x_mpc_;
+        int MPC_Stabilizer_time_adj_tick_y_mpc_;
 
         bool step_enable_bool_mpc_;
         bool step_enable_bool_one_tick_before_mpc_;

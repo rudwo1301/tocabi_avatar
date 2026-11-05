@@ -552,7 +552,7 @@ void fipmPlanner::IS_FIPM_CoM_Planner_MPC(double mpc_freq, double preview_window
     
     if(e_planner_data_txt_[0].is_open())
     {
-        e_planner_data_txt_[0] << walking_tick_mpc_         << "," << N_plan_mpc                << "," << 0                         << ","
+        e_planner_data_txt_[0] << walking_tick_mpc_          << "," << N_plan_mpc                << "," << 0                         << ","
                                 << MPC_Planner_state_mpc_(0) << "," << MPC_Planner_state_mpc_(3) << "," << MPC_Planner_state_mpc_(6) << ","
                                 << MPC_Planner_state_mpc_(1) << "," << MPC_Planner_state_mpc_(4) << "," << MPC_Planner_state_mpc_(7) << ","
                                 << MPC_Planner_state_mpc_(2) << "," << MPC_Planner_state_mpc_(5) << "," << MPC_Planner_state_mpc_(8) << ","

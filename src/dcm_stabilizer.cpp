@@ -39,7 +39,7 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
     double Q_dcm_x, Q_dcm_y, Q_dcm_z, R_dcm_x, R_dcm_y, R_dcm_z, R_dalp, R_df_x, R_df_y;
 
     Q_dcm_x = 1e-0; R_dcm_x = 1e-1; R_dalp = 1e+1; R_df_x = 1e-0;
-    Q_dcm_y = 1e-0; R_dcm_y = 1e-2;                R_df_y = 1e+2; //need tuning 1e+2 - 1e+3
+    Q_dcm_y = 1e-0; R_dcm_y = 1e-2;                R_df_y = 1e+3; //need tuning 1e+2 - 1e+3
     Q_dcm_z = 9e-1; R_dcm_z = 1e-1; //for 0.9 step time
 
     int mpc_tick = walking_tick_mpc_ - com_start_tick_mpc_;
@@ -352,8 +352,8 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
                 next_step_prev_bool       = (bool)(mpc_tick + mpc_synchro_hz*(i + 1) > ((1 - (bool)(current_step_num_mpc_))*t_temp_ + (j + 1)*t_total_mpc_ - t_dsp2_const_mpc_));
             }
 
-            //if((walking_tick_mpc_ > t_temp_ - (t_dsp2_const_mpc_ + step_enable_fix_time_pre_*hz_)) && (next_step_start_prev_tick < N_stab_mpc))
-            if(0)
+            if((walking_tick_mpc_ > t_temp_ - (t_dsp2_const_mpc_ + step_enable_fix_time_pre_*hz_)) && (next_step_start_prev_tick < N_stab_mpc))
+            //if(0)
             {
                 Sf1_stab_mpc_(i,0) = step_enable_bool_mpc_* next_step_prev_bool*(zmp_max_y_mpc_(i) - zmp_max_y_mpc_(int(t_dsp1_const_mpc_/mpc_synchro_hz)))/(MPC_Stabilizer_delf_mpc_y_(0));
                 if(walking_tick_mpc_ < t_temp_)
@@ -823,6 +823,28 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
         }
     }
 
+    double calc_time_adj = 0.0;
+
+    for(int i = 0; i < step_time_adj_candidate_num_; i++)
+    {
+        if(abs(MPC_Stabilizer_alpha_mpc_(i)) < 5e-3)
+        {
+            MPC_Stabilizer_alpha_mpc_(i) = 0.0;
+        }
+        calc_time_adj += i*MPC_Stabilizer_alpha_mpc_(i);
+    }
+
+    MPC_Stabilizer_time_adj_tick_x_mpc_ = max(round(calc_time_adj + 0.1), 0.0);
+    MPC_Stabilizer_time_adj_tick_y_mpc_ = max(round(calc_time_adj + 0.1), 0.0);
+
+    double time_adj_tick_mpc = 0.0;
+    time_adj_tick_mpc = max(MPC_Stabilizer_time_adj_tick_x_mpc_, MPC_Stabilizer_time_adj_tick_y_mpc_);
+    time_adj_tick_mpc = min(time_adj_tick_mpc, double(step_time_adj_candidate_num_ - 1));
+    if(current_step_num_mpc_ != 0 && step_enable_bool_mpc_ == 0)
+    {   
+        t_total_mpc_ = t_total_const_mpc_ - time_adj_tick_mpc*hz_/thread3_hz_;
+    }
+
     if(e_stabilizer_data_txt_[0].is_open())
     {
         e_stabilizer_data_txt_[0] << walking_tick_mpc_            << "," << N_stab_mpc                   << "," << b_                                    << ","
@@ -834,7 +856,8 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
                                   << com_dot_measured_mpc_(0)     << "," << com_dot_measured_mpc_(1)     << "," << com_dot_measured_mpc_(2)              << ","
                                   << step_time_adj_candidate_num_ << "," << step_enable_bool_mpc_        << "," << step_enable_bool_one_tick_before_mpc_ << ","
                                   << MPC_Stabilizer_delf_mpc_x_   << "," << MPC_Stabilizer_delf_mpc_y_   << "," << 0                                     << ","
-                                  << step_x_norm                  << "," << step_y_norm                  << "," << 0
+                                  << step_x_norm                  << "," << step_y_norm                  << "," << 0                                     << ","
+                                  << prev_zmp(0,0)                << "," << prev_zmp(1,0)                << "," << 0
                                   << endl;
     }
     else
@@ -871,4 +894,56 @@ void dcmStabilizer::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double mpc_pr
     data_save_calc.setZero(2*step_time_adj_candidate_num_);
     data_save_calc << MPC_Stabilizer_aux_mpc_x_, MPC_Stabilizer_aux_mpc_y_;
     e_stabilizer_data_txt_[10] << data_save_calc.transpose() << endl;
+}
+
+void dcmStabilizer::MPC_State_Step_Change()
+{   
+    Eigen::Vector2d del_F_mpc; del_F_mpc.setZero();
+    del_F_mpc(0) = MPC_Stabilizer_delf_mpc_x_.sum() - foot_step_support_frame_mpc_(current_step_num_mpc_, 0);
+    del_F_mpc(1) = MPC_Stabilizer_delf_mpc_y_.sum() - foot_step_support_frame_mpc_(current_step_num_mpc_, 1);
+
+    foot_step_support_frame_mpc_(current_step_num_mpc_, 0) += del_F_mpc(0);
+    foot_step_support_frame_mpc_(current_step_num_mpc_, 1) += del_F_mpc(1);
+    if((walking_tick_mpc_ - (t_start_mpc_ + t_total_mpc_) >= -hz_/thread3_hz_) && (current_step_num_mpc_ < total_step_num_mpc_ - 1))
+    {
+        Eigen::Vector3d var_after_step_change, var_before_step_change, frame_pos_diff;
+        Eigen::Matrix3d frame_rot_diff;
+
+        frame_rot_diff = DyrosMath::rotateWithZ(-foot_step_support_frame_mpc_(current_step_num_mpc_, 5));
+        frame_pos_diff(0) = foot_step_support_frame_mpc_(current_step_num_mpc_,0);
+        frame_pos_diff(1) = foot_step_support_frame_mpc_(current_step_num_mpc_,1);
+        frame_pos_diff(2) = foot_step_support_frame_mpc_(current_step_num_mpc_,2);
+
+        //com pos step change
+        var_before_step_change(0) = MPC_Stabilizer_state_mpc_(0);
+        var_before_step_change(1) = MPC_Stabilizer_state_mpc_(3);
+        var_before_step_change(2) = MPC_Stabilizer_state_mpc_(6);
+        var_after_step_change = frame_rot_diff*(var_before_step_change - frame_pos_diff);
+
+        MPC_Stabilizer_state_mpc_(0) = var_after_step_change(0);
+        MPC_Stabilizer_state_mpc_(3) = var_after_step_change(1);
+        MPC_Stabilizer_state_mpc_(6) = var_after_step_change(2);
+
+        //com vel step change
+        var_before_step_change(0) = MPC_Stabilizer_state_mpc_(1);
+        var_before_step_change(1) = MPC_Stabilizer_state_mpc_(4);
+        var_before_step_change(2) = MPC_Stabilizer_state_mpc_(7);
+        var_after_step_change = frame_rot_diff*var_before_step_change;
+
+        MPC_Stabilizer_state_mpc_(1) = var_after_step_change(0);
+        MPC_Stabilizer_state_mpc_(4) = var_after_step_change(1);
+        MPC_Stabilizer_state_mpc_(7) = var_after_step_change(2);
+
+        //vrp pos step change
+        var_before_step_change(0) = MPC_Stabilizer_state_mpc_(2);
+        var_before_step_change(1) = MPC_Stabilizer_state_mpc_(5);
+        var_before_step_change(2) = MPC_Stabilizer_state_mpc_(8);
+        var_after_step_change = frame_rot_diff*(var_before_step_change - frame_pos_diff);
+
+        MPC_Stabilizer_state_mpc_(2) = var_after_step_change(0);
+        MPC_Stabilizer_state_mpc_(5) = var_after_step_change(1);
+        MPC_Stabilizer_state_mpc_(8) = var_after_step_change(2);
+    }
+    foot_step_support_frame_mpc_(current_step_num_mpc_, 0) -= del_F_mpc(0);
+    foot_step_support_frame_mpc_(current_step_num_mpc_, 1) -= del_F_mpc(1);
 }
