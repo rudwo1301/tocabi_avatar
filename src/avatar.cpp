@@ -76,7 +76,7 @@ AvatarController::AvatarController(RobotData &rd) : rd_(rd)
     calibration_state_pub = nh_avatar_.advertise<std_msgs::String>("/tocabi_status", 5);
     calibration_state_gui_log_pub = nh_avatar_.advertise<std_msgs::String>("/tocabi/guilog", 100);
 
-    mujoco_ext_force_apply_pub = nh_avatar_.advertise<std_msgs::Float32MultiArray>("/tocabi_avatar/applied_ext_force", 10);
+    mujoco_ext_force_apply_pub = nh_avatar_.advertise<std_msgs::Float32MultiArray>("/mujoco_ros_interface/applied_ext_force", 10);
     mujoco_applied_ext_force_.data.resize(7);
 
     pedal_command = nh_avatar_.subscribe("/tocabi/pedalcommand", 100, &AvatarController::PedalCommandCallback, this); //MJ
@@ -91,16 +91,13 @@ AvatarController::AvatarController(RobotData &rd) : rd_(rd)
     ros::param::get("/econom2_ext_step",            param_ext_force_step_);
     ros::param::get("/econom2_extforce",            param_ext_force_);
     ros::param::get("/econom2_exttheta",            param_ext_theta_);
+    ros::param::get("/econom2_IS_FIPM",               param_IS_FIPM_);
 
-    ros::param::get("/econom2_stepping_stone",      param_stepping_stone_);
-    ros::param::get("/econom2_loco_manipulation",   param_loco_manipulation_);
     ros::param::get("/econom2_disturbance_walking", param_disturbance_walking_);
     
     if(!param_sim_mode_)
     {
-        param_loco_manipulation_ = true;
-        //param_disturbance_walking_ = true;
-        //param_stepping_stone_ = true;
+        param_disturbance_walking_ = true;
     }
 
     RigidBodyDynamics::Addons::URDFReadFromFile(desc_package_path.c_str(), &model_d_, true, false);
@@ -637,12 +634,6 @@ void AvatarController::computeSlow()
                 initial_flag = 0;
 
                 Initial_ref_q_ = rd_.q_;
-
-                if(param_stepping_stone_)
-                {
-                    zmp_x_max = 0.11;
-                    zmp_x_min = 0.05;
-                }
                 
                 if(scenario_num_ == 0)
                 {
@@ -704,34 +695,6 @@ void AvatarController::computeSlow()
 
                 e_tmp_graph17 << exp_dist.transpose() << endl;
 
-                if(walking_tick_ < t_temp_)
-                {                    
-                    if(param_loco_manipulation_)
-                    {
-                        double loco_q_13_1 = DyrosMath::cubic(walking_tick_,           2.0*hz_,           5.0*hz_, Initial_ref_q_(13), 0.40, 0.0, 0.0);
-                        double loco_q_13_2 = DyrosMath::cubic(walking_tick_, t_temp_ - 3.0*hz_, t_temp_ - 0.0*hz_,               0.40, 0.15, 0.0, 0.0);
-
-                        CAM_upper_init_q_(13) = min(loco_q_13_1, loco_q_13_2);
-
-                        double box_grab_angle = 0.00;
-
-                        CAM_upper_init_q_(15) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(15), -0.00, 0.0, 0.0);
-                        CAM_upper_init_q_(25) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(25),  0.00, 0.0, 0.0);
-
-                        CAM_upper_init_q_(16) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(16), -0.00, 0.0, 0.0);
-                        CAM_upper_init_q_(26) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(26),  0.00, 0.0, 0.0);
-
-                        CAM_upper_init_q_(22) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(22), -1.27, 0.0, 0.0);
-                        CAM_upper_init_q_(32) = DyrosMath::cubic(walking_tick_,           2.0*hz_, 5.0*hz_, Initial_ref_q_(32),  1.27, 0.0, 0.0);
-
-                        if(walking_tick_ >= 5.0*hz_)
-                        {   
-                            CAM_upper_init_q_(15) = DyrosMath::cubic(walking_tick_, 5.0*hz_, 8.0*hz_,               0.00, -0.40, 0.0, 0.0);
-                            CAM_upper_init_q_(25) = DyrosMath::cubic(walking_tick_, 5.0*hz_, 8.0*hz_,               0.00,  0.40, 0.0, 0.0);
-                        }
-                    }
-                }
-
                 ref_q_.segment(0, 12) = q_des_;
                 
                 if (atb_grav_update_ == false)
@@ -769,10 +732,7 @@ void AvatarController::computeSlow()
                 updateNextStepTime();
                 q_prev_MJ_ = rd_.q_;
 
-                //if(!param_loco_manipulation_ && current_step_num_ == param_ext_force_step_ && (walking_tick_ >= t_start_ + param_ext_force_time_*hz_)  && (walking_tick_ < t_start_ + (param_ext_force_time_ + 0.2)*hz_))
-                if(!param_loco_manipulation_ 
-                &&(walking_tick_ > t_temp_  + t_total_*max(param_ext_force_step_, 0) + param_ext_force_time_*hz_)
-                &&(walking_tick_ <=  t_temp_  + t_total_*max(param_ext_force_step_, 0) + param_ext_force_time_*hz_ + 0.2*hz_))
+                if(current_step_num_ == param_ext_force_step_ && (walking_tick_ >= t_start_ + param_ext_force_time_*hz_)  && (walking_tick_ < t_start_ + (param_ext_force_time_ + 0.2)*hz_))
                 { 
                     mujoco_applied_ext_force_.data[0] = param_ext_force_*cos(param_ext_theta_*DEG2RAD);
                     mujoco_applied_ext_force_.data[1] = param_ext_force_*sin(param_ext_theta_*DEG2RAD);
@@ -785,30 +745,6 @@ void AvatarController::computeSlow()
 
                     mujoco_ext_force_apply_pub.publish(mujoco_applied_ext_force_);                    
                 } 
-                else if(param_loco_manipulation_ && !param_disturbance_walking_ && (bool)(scenario_num_) && (walking_tick_ >= t_temp_ - param_ext_force_time_*hz_) && (walking_tick_ < t_temp_ - param_ext_force_time_*hz_ + 0.2*hz_))
-                {
-                    mujoco_applied_ext_force_.data[0] = param_ext_force_*cos(param_ext_theta_*DEG2RAD); //x-axis linear force
-                    mujoco_applied_ext_force_.data[1] = param_ext_force_*sin(param_ext_theta_*DEG2RAD); //y-axis linear force
-                    mujoco_applied_ext_force_.data[2] = 0; //z-axis linear force
-                    mujoco_applied_ext_force_.data[3] = 0; //x-axis angular moment
-                    mujoco_applied_ext_force_.data[4] = 0; //y-axis angular moment
-                    mujoco_applied_ext_force_.data[5] = 0; //z-axis angular moment
-                    mujoco_applied_ext_force_.data[6] = 1; //link idx; 1:pelvis
-
-                    mujoco_ext_force_apply_pub.publish(mujoco_applied_ext_force_);
-                }
-                else if(param_loco_manipulation_ && param_disturbance_walking_ && current_step_num_ == param_ext_force_step_ && (bool)(scenario_num_) && (walking_tick_ >= t_start_ + param_ext_force_time_*hz_)  && (walking_tick_ < t_start_ + (param_ext_force_time_ + 0.2)*hz_))
-                {
-                    mujoco_applied_ext_force_.data[0] = param_ext_force_*cos(param_ext_theta_*DEG2RAD); //x-axis linear force
-                    mujoco_applied_ext_force_.data[1] = param_ext_force_*sin(param_ext_theta_*DEG2RAD); //y-axis linear force
-                    mujoco_applied_ext_force_.data[2] = 0; //z-axis linear force
-                    mujoco_applied_ext_force_.data[3] = 0; //x-axis angular moment
-                    mujoco_applied_ext_force_.data[4] = 0; //y-axis angular moment
-                    mujoco_applied_ext_force_.data[5] = 0; //z-axis angular moment
-                    mujoco_applied_ext_force_.data[6] = 1; //link idx; 1:pelvis
-
-                    mujoco_ext_force_apply_pub.publish(mujoco_applied_ext_force_);
-                }
                 else
                 {
                     mujoco_applied_ext_force_.data[0] = 0; //x-axis linear force
@@ -821,20 +757,6 @@ void AvatarController::computeSlow()
 
                     mujoco_ext_force_apply_pub.publish(mujoco_applied_ext_force_);
                 }
-
-                //if(walking_tick_ <= 8.0*hz_)
-                //{ 
-                //    mujoco_applied_ext_force_.data[0] = - param_ext_force_time_*exp_dist(0);
-                //    mujoco_applied_ext_force_.data[1] = - param_ext_force_time_*exp_dist(2);
-                //    mujoco_applied_ext_force_.data[2] = - param_ext_force_time_*exp_dist(1);
-                //    mujoco_applied_ext_force_.data[3] = 0.0;
-                //    mujoco_applied_ext_force_.data[4] = 0.0;
-                //    mujoco_applied_ext_force_.data[5] = 0.0;
-                //    
-                //    mujoco_applied_ext_force_.data[6] = 1; //link idx; 1:pelvis
-                //    
-                //    mujoco_ext_force_apply_pub.publish(mujoco_applied_ext_force_);                    
-                //} 
             }
         }
         else
@@ -5784,17 +5706,16 @@ void AvatarController::computeThread3()
 
     std::chrono::steady_clock::time_point t2 = std::chrono::steady_clock::now();
     e_mpc_time_graph << std::chrono::duration_cast<std::chrono::microseconds>(t2 - t1).count()*1e-6 << ",";
-    if((scenario_num_ == 0)
-    && (walking_tick_mpc_ - com_start_tick_mpc_ > 2*t_total_mpc_ - hz_/thread3_hz_)
-    && (current_step_num_mpc_ == total_step_num_mpc_ - 1)
-    && (param_loco_manipulation_ == 1)
-    && (scenario_end_num_ > 0))
+
+    //Stabilizer model select: swap these two lines to compare the model-matched FIPM against the model-ignoring LIPM.
+    //The planner stays FIPM in both cases so the CoM/height reference is identical and only the stabilizer differs.
+    if(param_IS_FIPM_)
     {
-        cout << "STABILIZER IS NOT RUNNED In this TICK FOR SMOOTH GRF" << endl << endl;
+        IS_FIPM_3D_DCM_Stabilizer_MPC(thread3_hz_, preview_time);
     }
     else
     {
-        IS_FIPM_3D_DCM_Stabililzer_MPC(thread3_hz_, preview_time);
+        IS_LIPM_DCM_Stabilizer_MPC(thread3_hz_, preview_time);
     }
 
     //send mpc data
@@ -5865,7 +5786,7 @@ void AvatarController::econom2_thread_stepchange()
         {
             frame_rot_diff = Eigen::MatrixXd::Identity(3,3);
             frame_pos_diff(0) = 0.000;
-            frame_pos_diff(1) = 0.245*param_loco_manipulation_;
+            frame_pos_diff(1) = 0.000;
             frame_pos_diff(2) = 0.000;
         }
 
@@ -7166,7 +7087,7 @@ void AvatarController::calculateFootStepTotal_ec2()
     int foot_step_rows = foot_step_.rows();
     cout << "foot_step_rows: " << foot_step_rows << endl;
     //int number_of_total_foot_step = min(15, foot_step_rows);
-    int number_of_total_foot_step = foot_step_rows*(1 - param_stepping_stone_) + 20*param_stepping_stone_;
+    int number_of_total_foot_step = foot_step_rows;
     Eigen::MatrixXd foot_step_temp;
     foot_step_temp.resize(number_of_total_foot_step, 7);
     foot_step_temp.setZero();
@@ -7179,33 +7100,6 @@ void AvatarController::calculateFootStepTotal_ec2()
             foot_step_temp(i,6) = 1.0; // left support
         else
             foot_step_temp(i,6) = 0.0; // right support
-    }
-
-    if(param_stepping_stone_)
-    {
-        foot_step_temp( 2, 0) = foot_step_temp( 1, 0) + 0.195; foot_step_temp( 2, 2) = 0.00;
-        foot_step_temp( 3, 0) = foot_step_temp( 2, 0) + 0.195; foot_step_temp( 3, 2) = 0.10;
-        foot_step_temp( 4, 0) = foot_step_temp( 3, 0) + 0.195; foot_step_temp( 4, 2) = 0.10;
-        foot_step_temp( 5, 0) = foot_step_temp( 4, 0) - 0.095; foot_step_temp( 5, 2) = 0.10;
-        foot_step_temp( 6, 0) = foot_step_temp( 5, 0) + 0.195; foot_step_temp( 6, 2) = 0.10;
-        foot_step_temp( 7, 0) = foot_step_temp( 6, 0) + 0.195; foot_step_temp( 7, 2) = 0.20;
-        foot_step_temp( 8, 0) = foot_step_temp( 7, 0) + 0.195; foot_step_temp( 8, 2) = 0.10;
-        foot_step_temp( 9, 0) = foot_step_temp( 8, 0) + 0.095; foot_step_temp( 9, 2) = 0.20;
-        foot_step_temp(10, 0) = foot_step_temp( 9, 0) + 0.195; foot_step_temp(10, 2) = 0.10;
-        foot_step_temp(11, 0) = foot_step_temp(10, 0) + 0.195; foot_step_temp(11, 2) = 0.10;
-        foot_step_temp(12, 0) = foot_step_temp(11, 0) + 0.195; foot_step_temp(12, 2) = 0.00;
-        foot_step_temp(13, 0) = foot_step_temp(12, 0) - 0.105; foot_step_temp(13, 2) = 0.10;
-        foot_step_temp(14, 0) = foot_step_temp(13, 0) + 0.195; foot_step_temp(14, 2) = 0.00;
-        foot_step_temp(15, 0) = foot_step_temp(14, 0) + 0.195; foot_step_temp(15, 2) = 0.00;
-        foot_step_temp(16, 0) = foot_step_temp(15, 0) + 0.195; foot_step_temp(16, 2) = 0.00;
-        foot_step_temp(17, 0) = foot_step_temp(16, 0) + 0.195; foot_step_temp(17, 2) = 0.00;
-        foot_step_temp(18, 0) = foot_step_temp(17, 0) + 0.000; foot_step_temp(18, 2) = 0.00;
-        foot_step_temp(19, 0) = foot_step_temp(18, 0) + 0.000; foot_step_temp(19, 2) = 0.00;
-
-        foot_step_ = foot_step_temp;
-        cout << "stepping stone foot step rows: " << foot_step_.rows() << endl;
-        //foot_step_.setZero(number_of_total_foot_step, 7);
-        foot_step_support_frame_.setZero(number_of_total_foot_step, 7);
     }
 }
 
@@ -7257,10 +7151,7 @@ void AvatarController::calculateFootStepTotal_MJ()
     if (length_to_target == 0.0)
     {
         middle_total_step_number = 20; //total foot step number
-        if(param_loco_manipulation_)
-        {
-            middle_total_step_number = 4; //total foot step number
-        }
+
         dlength = 0;
     }
 
@@ -7894,23 +7785,6 @@ void AvatarController::zmpGenerator(const unsigned int norm_size, const unsigned
         ref_vrp_.block(2.0*hz_, 0, t_temp_ - 2.0*hz_, 2) = ref_zmp_.block(2.0*hz_, 0, t_temp_ - 2.0*hz_, 2);
         ref_vrp_.block(2.0*hz_, 2, t_temp_ - 2.0*hz_, 1).setConstant(zc_mj_);
 
-        //if(scenario_num_ && param_loco_manipulation_)
-        if(param_loco_manipulation_)
-        {
-            Eigen::VectorXd vrp_z_lin;
-            vrp_z_lin.setLinSpaced(3.0*hz_, zc_mj_, zc_mj_ - 0.075*param_loco_manipulation_);
-            ref_vrp_.block(2.0*hz_, 2, 3.0*hz_, 1) = vrp_z_lin;
-
-            //ref_vrp_.block(5.0*hz_,           2, t_temp_ - 8.5*hz_, 1).setConstant(zc_mj_ - 0.100*param_loco_manipulation_);
-            //ref_vrp_.block(5.0*hz_,           2, t_temp_ - 8.0*hz_, 1).setConstant(zc_mj_ - 0.100*param_loco_manipulation_);
-            ref_vrp_.block(5.0*hz_,           2, t_temp_ - 8.0*hz_, 1).setConstant(zc_mj_ - 0.075*param_loco_manipulation_);
-
-            //vrp_z_lin.setLinSpaced(3.0*hz_, zc_mj_ - 0.075*param_loco_manipulation_, zc_mj_ - 0.025*param_disturbance_walking_);
-            vrp_z_lin.setLinSpaced(3.0*hz_, zc_mj_ - 0.075*param_loco_manipulation_, zc_mj_ - 0.025);
-            //ref_vrp_.block(t_temp_ - 3.5*hz_, 2, 3.0*hz_, 1) = vrp_z_lin;
-            ref_vrp_.block(t_temp_ - 3.0*hz_, 2, 3.0*hz_, 1) = vrp_z_lin;
-        }
-
         ref_zmp_wo_offset_.block(2.0*hz_, 0, t_temp_ - 2.0*hz_, 1).setConstant(0.0);
         ref_zmp_wo_offset_.block(2.0*hz_, 1, t_temp_ - 2.0*hz_, 1).setConstant(com_support_init_(1));
 
@@ -8175,69 +8049,16 @@ void AvatarController::onestepVrpZ(unsigned int current_step_number, double t_to
     height_diff_vec_(1) = 0.00;
     height_diff_vec_(2) = 0.00;
     height_diff_vec_(3) = 0.00;
-    height_diff_vec_(4) = 0.10;
-    height_diff_vec_(5) = 0.10;
-    height_diff_vec_(6) = 0.10;
+    height_diff_vec_(4) = 0.00;
+    height_diff_vec_(5) = 0.00;
+    height_diff_vec_(6) = 0.00;
+    height_diff_vec_(7) = 0.10;
+    height_diff_vec_(8) = 0.10;
+    
 
     if(param_disturbance_walking_ && scenario_num_)
     {
         height_diff_vec_(0) = 0.05;
-    }
-
-    if(param_stepping_stone_)
-    {
-        if(current_step_num_ == 4)
-        {
-            height_diff_vec_(4) = 0.10;
-        }
-        height_diff_vec_(5) = 0.10;
-        height_diff_vec_(6) = 0.10;
-
-        if(current_step_num_ == 8)
-        {
-            height_diff_vec_(8) = 0.10;
-            height_diff_vec_(9) = 0.10;
-        }
-
-        if(current_step_num_ == 9)
-        {
-            height_diff_vec_(9) = 0.00;
-        }
-
-        if(current_step_num_ == 10)
-        {
-            height_diff_vec_(10) = 0.10;
-            height_diff_vec_(11) = 0.10;
-        }
-
-        if(current_step_num_ == 11)
-        {
-            height_diff_vec_(11) = 0.00;
-        }
-
-        height_diff_vec_(12) = 0.10;
-        
-        if(current_step_num_ == 12)
-        {
-            height_diff_vec_(13) = 0.10;
-        }
-
-        if(current_step_num_ == 13)
-        {
-            height_diff_vec_(13) = 0.00;
-        }
-
-        if(current_step_num_ == 14)
-        {
-            height_diff_vec_(14) = 0.10;
-            height_diff_vec_(15) = 0.10;
-        }
-        
-        if(current_step_num_ == 15)
-        {
-            height_diff_vec_(15) = 0.00;
-        }
-
     }
 
     double height_diff, height_diff_prev, height_diff_next;
@@ -8257,6 +8078,9 @@ void AvatarController::onestepVrpZ(unsigned int current_step_number, double t_to
     height_diff_next = DyrosMath::minmax_cut(height_diff_next, -0.20, 0.00);
 
     temp_pz.setConstant(zc_mj_ + height_diff);
+    temp_pz.segment(                    0, t_dsp1_                        ).setConstant(zc_mj_ + height_diff_prev);
+    temp_pz.segment(              t_dsp1_, t_total_zmp - t_dsp1_ - t_dsp2_).setConstant(zc_mj_ + height_diff);
+    temp_pz.segment(t_total_zmp - t_dsp2_, t_dsp2_                        ).setConstant(zc_mj_ + height_diff);
 
     if(param_disturbance_walking_ && scenario_num_)
     {
@@ -8354,8 +8178,8 @@ void AvatarController::getFootTrajectory()
     double t_dsp1_foot_traj = t_dsp1_;
     double t_dsp2_foot_traj = t_dsp2_;
 
-    double foot_traj_lift_param = 0.5 - 0.2*param_stepping_stone_;
-    double foot_traj_land_param = 0.5 - 0.2*param_stepping_stone_;
+    double foot_traj_lift_param = 0.5;
+    double foot_traj_land_param = 0.5;
 
     double target_foot_height = max(foot_step_support_frame_(max(current_step_num_ - 2, 0), 2), foot_step_support_frame_(current_step_num_, 2)) + foot_height_;
 
@@ -9351,12 +9175,12 @@ void AvatarController::getComTrajectory_mpc()
             atb_mpc_to_main_update_ = true;
 
             MPC_Planner_u_main_(0) = MPC_Planner_u_container_from_mpc_(0);
-            MPC_Planner_u_main_(1) = MPC_Planner_u_container_from_mpc_(0);
-            MPC_Planner_u_main_(2) = 0.0;
+            MPC_Planner_u_main_(1) = MPC_Planner_u_container_from_mpc_(1);
+            MPC_Planner_u_main_(2) = MPC_Planner_u_container_from_mpc_(2);
 
             MPC_Stabilizer_u_main_(0) = MPC_Stabilizer_u_container_from_mpc_(0);
             MPC_Stabilizer_u_main_(1) = MPC_Stabilizer_u_container_from_mpc_(1);
-            MPC_Stabilizer_u_main_(2) = 0.0;
+            MPC_Stabilizer_u_main_(2) = MPC_Stabilizer_u_container_from_mpc_(2);
 
             MPC_Stabilizer_state_main_p_ = MPC_Stabilizer_state_main_;
 
@@ -9533,7 +9357,7 @@ void AvatarController::getComTrajectory_mpc()
         {
             frame_rot_diff = Eigen::MatrixXd::Identity(3,3);
             frame_pos_diff(0) = 0.000;
-            frame_pos_diff(1) = 0.245*param_loco_manipulation_;
+            frame_pos_diff(1) = 0.000;
             frame_pos_diff(2) = 0.000;
         }
         //com step change
@@ -9657,26 +9481,28 @@ void AvatarController::getComTrajectory_mpc()
 }
 
 ////////////////////// Econom2 function
-
 void AvatarController::IS_LIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz)
 {
-    double wpvx, wpvy;
-    double wdvx, wdvy;
+    double wpvx, wpvy, wpvz;
+    double wdvx, wdvy, wdvz;
 
-    wpvx = 1e+2; wpvy = 1e+6;
-    wdvx = 1e+0; wdvy = 1e+0;
+    wpvx = 1e+2; wpvy = 1e+6; wpvz = 1e+2;
+    wdvx = 1e+0; wdvy = 1e+0; wdvz = 1e+0;
 
     int mpc_tick = walking_tick_mpc_ - com_start_tick_mpc_;
     const int N_plan_mpc = mpc_preview_window*mpc_freq;
     const int N_step = t_total_const_/mpc_synchro_hz;
     const int N_state = 3; //com position, com velocity, vrp position
-    static int MPC_first_loop = 0;
 
     double lambda_is_calc = exp(-w_*mpc_dt);
 
-    if(MPC_first_loop == 0)
+    int input_num = 3*N_plan_mpc;
+    //              vrp                    
+    int const_num = 6*N_plan_mpc + 3;
+    //              vrp            IS
+    if(MPC_first_loop_ == 0)
     {
-        cout << "Initialization of IS LIPM Planner MPC." << endl;
+        cout << "Initialization of IS FIPM Planner MPC." << endl;
         A_mpc_.resize(N_state,N_state);
         Eigen::MatrixXd A_mpc_cont; A_mpc_cont.resize(N_state, N_state); A_mpc_cont.setZero();
         A_mpc_cont <<     0, 1,      0,
@@ -9755,11 +9581,13 @@ void AvatarController::IS_LIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, d
             Pu_step_calc = A_mpc_*Pu_step_calc;
         }
 
-        SUx_plan_mpc_.setZero(N_plan_mpc, 2*N_plan_mpc); SUx_plan_mpc_ << MatrixXd::Identity(N_plan_mpc, N_plan_mpc), MatrixXd::Zero(N_plan_mpc, N_plan_mpc);
-        SUy_plan_mpc_.setZero(N_plan_mpc, 2*N_plan_mpc); SUy_plan_mpc_ << MatrixXd::Zero(N_plan_mpc, N_plan_mpc), MatrixXd::Identity(N_plan_mpc, N_plan_mpc);
+        SUx_plan_mpc_.setZero(N_plan_mpc, input_num); SUx_plan_mpc_ << MatrixXd::Identity(N_plan_mpc, N_plan_mpc), MatrixXd::Zero(N_plan_mpc, N_plan_mpc), MatrixXd::Zero(N_plan_mpc, N_plan_mpc);
+        SUy_plan_mpc_.setZero(N_plan_mpc, input_num); SUy_plan_mpc_ << MatrixXd::Zero(N_plan_mpc, N_plan_mpc), MatrixXd::Identity(N_plan_mpc, N_plan_mpc), MatrixXd::Zero(N_plan_mpc, N_plan_mpc);
+        SUz_plan_mpc_.setZero(N_plan_mpc, input_num); SUz_plan_mpc_ << MatrixXd::Zero(N_plan_mpc, N_plan_mpc), MatrixXd::Zero(N_plan_mpc, N_plan_mpc), MatrixXd::Identity(N_plan_mpc, N_plan_mpc);
 
-        ssx_plan_mpc_.setZero(N_state,2*N_state); ssx_plan_mpc_ << MatrixXd::Identity(N_state,N_state), MatrixXd::Zero(N_state,N_state);
-        ssy_plan_mpc_.setZero(N_state,2*N_state); ssy_plan_mpc_ << MatrixXd::Zero(N_state,N_state), MatrixXd::Identity(N_state,N_state);
+        ssx_plan_mpc_.setZero(N_state, 3*N_state); ssx_plan_mpc_ << MatrixXd::Identity(N_state, N_state), MatrixXd::Zero(N_state, N_state), MatrixXd::Zero(N_state, N_state);
+        ssy_plan_mpc_.setZero(N_state, 3*N_state); ssy_plan_mpc_ << MatrixXd::Zero(N_state, N_state), MatrixXd::Identity(N_state, N_state), MatrixXd::Zero(N_state, N_state);
+        ssz_plan_mpc_.setZero(N_state, 3*N_state); ssz_plan_mpc_ << MatrixXd::Zero(N_state, N_state), MatrixXd::Zero(N_state, N_state), MatrixXd::Identity(N_state, N_state);
 
         Qmat_plan_mpc_.resize(N_plan_mpc, N_plan_mpc);
         Qmat_plan_mpc_.setIdentity();
@@ -9770,22 +9598,33 @@ void AvatarController::IS_LIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, d
         Qycalc_plan_mpc_.setZero(N_plan_mpc, N_plan_mpc);
         Qycalc_plan_mpc_ = Pvpu_plan_mpc_.transpose()*wpvy*Qmat_plan_mpc_*Pvpu_plan_mpc_ + wdvy*Qmat_plan_mpc_;
 
-        Qcalc_plan_mpc_.setZero(2*N_plan_mpc, 2*N_plan_mpc);
-        Qcalc_plan_mpc_ = SUx_plan_mpc_.transpose()*Qxcalc_plan_mpc_*SUx_plan_mpc_ + SUy_plan_mpc_.transpose()*Qycalc_plan_mpc_*SUy_plan_mpc_;
+        Qzcalc_plan_mpc_.setZero(N_plan_mpc, N_plan_mpc);
+        Qzcalc_plan_mpc_ = Pvpu_plan_mpc_.transpose()*wpvz*Qmat_plan_mpc_*Pvpu_plan_mpc_ + wdvz*Qmat_plan_mpc_;
+
+        Qcalc_plan_mpc_.setZero(input_num, input_num);
+        Qcalc_plan_mpc_ = SUx_plan_mpc_.transpose()*Qxcalc_plan_mpc_*SUx_plan_mpc_ 
+                        + SUy_plan_mpc_.transpose()*Qycalc_plan_mpc_*SUy_plan_mpc_
+                        + SUz_plan_mpc_.transpose()*Qzcalc_plan_mpc_*SUz_plan_mpc_;
         
-        gxcalc_plan_mpc_.setZero(2*N_plan_mpc, N_plan_mpc);
+        gxcalc_plan_mpc_.setZero(input_num, N_plan_mpc);
         gxcalc_plan_mpc_ = SUx_plan_mpc_.transpose()*Pvpu_plan_mpc_.transpose()*wpvx*Qmat_plan_mpc_;
 
-        gycalc_plan_mpc_.setZero(2*N_plan_mpc, N_plan_mpc);
+        gycalc_plan_mpc_.setZero(input_num, N_plan_mpc);
         gycalc_plan_mpc_ = SUy_plan_mpc_.transpose()*Pvpu_plan_mpc_.transpose()*wpvy*Qmat_plan_mpc_;
 
-        QP_MPC_Planner_.InitializeProblemSize(2*N_plan_mpc, 2*N_plan_mpc + 3);
+        gzcalc_plan_mpc_.setZero(input_num, N_plan_mpc);
+        gzcalc_plan_mpc_ = SUz_plan_mpc_.transpose()*Pvpu_plan_mpc_.transpose()*wpvz*Qmat_plan_mpc_;
 
-        MPC_Planner_u_mpc_.setZero(2*N_plan_mpc);
+        QP_MPC_Planner_.InitializeProblemSize(input_num, const_num);
+
+        MPC_Planner_u_mpc_.setZero(input_num);
+        MPC_Planner_SQP_du_mpc_.setZero(input_num);
+
+        MPC_Planner_u_mpc_sep_.setZero(3);
 
         Planner_State_Prev_mpc_.setZero(9, N_plan_mpc);
 
-        Pv_dot_ref_mpc_.setZero(N_step, 2);
+        Pv_dot_ref_mpc_.setZero(N_step, 3);
         
         zmp_max_x_mpc_.setZero(N_plan_mpc);
         zmp_min_x_mpc_.setZero(N_plan_mpc);
@@ -9793,22 +9632,109 @@ void AvatarController::IS_LIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, d
         zmp_max_y_mpc_.setZero(N_plan_mpc);
         zmp_min_y_mpc_.setZero(N_plan_mpc);
 
-        MPC_first_loop = 1;
-        cout << "Initialization of IS LIPM Planner MPC is completed." << endl;
+        t_total_mpc_ = t_total_const_;
+
+        zmp_time_calc_x_.setZero(N_plan_mpc);
+        zmp_time_calc_y_.setZero(N_plan_mpc);
+
+        IS_FIPM_SQP_x_phi_N_plan_mpc_.setZero(3*N_plan_mpc*N_plan_mpc, 3*N_plan_mpc);
+        IS_FIPM_SQP_x_pi_N_plan_mpc_.setZero (3*N_plan_mpc*N_plan_mpc, 3*N_state);
+        IS_FIPM_SQP_x_pi2_N_plan_mpc_.setZero(3*N_plan_mpc*N_plan_mpc, 1);
+        IS_FIPM_SQP_x_pi3_N_plan_mpc_.setZero(3*N_plan_mpc*N_plan_mpc, 1);
+        IS_FIPM_SQP_x_ri_N_plan_mpc_.setZero (3*N_state*N_plan_mpc,    3*N_state);
+        IS_FIPM_SQP_x_ri2_N_plan_mpc_.setZero(1*N_plan_mpc,            3*N_state);
+        IS_FIPM_SQP_x_ri3_N_plan_mpc_.setZero(1*N_plan_mpc,            3*N_state);
+        IS_FIPM_SQP_y_phi_N_plan_mpc_.setZero(3*N_plan_mpc*N_plan_mpc, 3*N_plan_mpc);
+        IS_FIPM_SQP_y_pi_N_plan_mpc_.setZero (3*N_plan_mpc*N_plan_mpc, 3*N_state);
+        IS_FIPM_SQP_y_pi2_N_plan_mpc_.setZero(3*N_plan_mpc*N_plan_mpc, 1);
+        IS_FIPM_SQP_y_pi3_N_plan_mpc_.setZero(3*N_plan_mpc*N_plan_mpc, 1);
+        IS_FIPM_SQP_y_ri_N_plan_mpc_.setZero (3*N_state*N_plan_mpc,    3*N_state);
+        IS_FIPM_SQP_y_ri2_N_plan_mpc_.setZero(1*N_plan_mpc,            3*N_state);
+        IS_FIPM_SQP_y_ri3_N_plan_mpc_.setZero(1*N_plan_mpc,            3*N_state);
+        
+        int calc_index  = 0;
+        int calc_index2 = 0;
+        Eigen::MatrixXd Si_mpc; Si_mpc.setZero(1, N_plan_mpc);
+
+        for(int i = 0; i < N_plan_mpc; i++)
+        {
+            Si_mpc.setZero(1, N_plan_mpc);
+            Si_mpc(0, i) = 1;
+
+            IS_FIPM_SQP_x_phi_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 3*N_plan_mpc) = (Si_mpc*Pvpu_plan_mpc_*SUx_plan_mpc_).transpose()*(Si_mpc*Pcpu_plan_mpc_*SUz_plan_mpc_)
+                                                                                           - (Si_mpc*Pvpu_plan_mpc_*SUz_plan_mpc_).transpose()*(Si_mpc*Pcpu_plan_mpc_*SUx_plan_mpc_);
+
+            IS_FIPM_SQP_y_phi_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 3*N_plan_mpc) = (Si_mpc*Pvpu_plan_mpc_*SUy_plan_mpc_).transpose()*(Si_mpc*Pcpu_plan_mpc_*SUz_plan_mpc_)
+                                                                                           - (Si_mpc*Pvpu_plan_mpc_*SUz_plan_mpc_).transpose()*(Si_mpc*Pcpu_plan_mpc_*SUy_plan_mpc_);
+
+            IS_FIPM_SQP_x_pi_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 3*N_state) = (Si_mpc*Pcpu_plan_mpc_*SUz_plan_mpc_).transpose()*(Si_mpc*Pvps_plan_mpc_*ssx_plan_mpc_)
+                                                                                       + (Si_mpc*Pvpu_plan_mpc_*SUx_plan_mpc_).transpose()*(Si_mpc*Pcps_plan_mpc_*ssz_plan_mpc_)
+                                                                                       - (Si_mpc*Pcpu_plan_mpc_*SUx_plan_mpc_).transpose()*(Si_mpc*Pvps_plan_mpc_*ssz_plan_mpc_)
+                                                                                       - (Si_mpc*Pvpu_plan_mpc_*SUz_plan_mpc_).transpose()*(Si_mpc*Pcps_plan_mpc_*ssx_plan_mpc_);
+            
+            IS_FIPM_SQP_x_pi2_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 1) = (GRAVITY*b_*b_*(Si_mpc*Pcpu_plan_mpc_*SUx_plan_mpc_)).transpose();
+
+            IS_FIPM_SQP_x_pi3_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 1) = (Si_mpc*(Pcpu_plan_mpc_ - Pvpu_plan_mpc_)*SUz_plan_mpc_).transpose();
+
+            IS_FIPM_SQP_y_pi_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 3*N_state) = (Si_mpc*Pcpu_plan_mpc_*SUz_plan_mpc_).transpose()*(Si_mpc*Pvps_plan_mpc_*ssy_plan_mpc_)
+                                                                                       + (Si_mpc*Pvpu_plan_mpc_*SUy_plan_mpc_).transpose()*(Si_mpc*Pcps_plan_mpc_*ssz_plan_mpc_)
+                                                                                       - (Si_mpc*Pcpu_plan_mpc_*SUy_plan_mpc_).transpose()*(Si_mpc*Pvps_plan_mpc_*ssz_plan_mpc_)
+                                                                                       - (Si_mpc*Pvpu_plan_mpc_*SUz_plan_mpc_).transpose()*(Si_mpc*Pcps_plan_mpc_*ssy_plan_mpc_);
+
+            IS_FIPM_SQP_y_pi2_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 1) = (GRAVITY*b_*b_*(Si_mpc*Pcpu_plan_mpc_*SUy_plan_mpc_)).transpose();
+
+            IS_FIPM_SQP_y_pi3_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 1) = (Si_mpc*(Pcpu_plan_mpc_ - Pvpu_plan_mpc_)*SUz_plan_mpc_).transpose();
+
+            calc_index += 3*N_plan_mpc;
+
+            IS_FIPM_SQP_x_ri_N_plan_mpc_.block(calc_index2, 0, 3*N_state, 3*N_state) = (Si_mpc*Pvps_plan_mpc_*ssx_plan_mpc_).transpose()*(Si_mpc*Pcps_plan_mpc_*ssz_plan_mpc_)
+                                                                                     - (Si_mpc*Pvps_plan_mpc_*ssz_plan_mpc_).transpose()*(Si_mpc*Pcps_plan_mpc_*ssx_plan_mpc_);
+
+            IS_FIPM_SQP_x_ri2_N_plan_mpc_.block(i, 0, 1, 3*N_state)                  = GRAVITY*b_*b_*(Si_mpc*Pcps_plan_mpc_*ssx_plan_mpc_);
+            
+            IS_FIPM_SQP_x_ri3_N_plan_mpc_.block(i, 0, 1, 3*N_state)                  = (Si_mpc*(Pcps_plan_mpc_ - Pvps_plan_mpc_)*ssz_plan_mpc_);
+
+            IS_FIPM_SQP_y_ri_N_plan_mpc_.block(calc_index2, 0, 3*N_state, 3*N_state) = (Si_mpc*Pvps_plan_mpc_*ssy_plan_mpc_).transpose()*(Si_mpc*Pcps_plan_mpc_*ssz_plan_mpc_)
+                                                                                     - (Si_mpc*Pvps_plan_mpc_*ssz_plan_mpc_).transpose()*(Si_mpc*Pcps_plan_mpc_*ssy_plan_mpc_);
+
+            IS_FIPM_SQP_y_ri2_N_plan_mpc_.block(i, 0, 1, 3*N_state)                  = GRAVITY*b_*b_*(Si_mpc*Pcps_plan_mpc_*ssy_plan_mpc_);
+
+            IS_FIPM_SQP_y_ri3_N_plan_mpc_.block(i, 0, 1, 3*N_state)                  = (Si_mpc*(Pcps_plan_mpc_ - Pvps_plan_mpc_)*ssz_plan_mpc_);
+
+            calc_index2 += 3*N_state;
+        }
+
+        cout << "Initialization of IS FIPM Planner MPC is completed." << endl;
     }
 
     Eigen::VectorXd Pv_x_ref(N_plan_mpc);
     Eigen::VectorXd Pv_y_ref(N_plan_mpc);
+    Eigen::VectorXd Pv_z_ref(N_plan_mpc);
+
+    Eigen::VectorXd zmp_max_x_time_plan_mpc(N_plan_mpc);
+    Eigen::VectorXd zmp_min_x_time_plan_mpc(N_plan_mpc);
+
+    Eigen::VectorXd zmp_max_y_time_plan_mpc(N_plan_mpc);
+    Eigen::VectorXd zmp_min_y_time_plan_mpc(N_plan_mpc);
 
     for(int i = 0; i < N_plan_mpc; i++)
     {
-        Pv_x_ref(i) = ref_zmp_mpc_(mpc_tick + mpc_synchro_hz*(i+1),0);
-        Pv_y_ref(i) = ref_zmp_mpc_(mpc_tick + mpc_synchro_hz*(i+1),1);
+        Pv_x_ref(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i+1),0);
+        Pv_y_ref(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i+1),1);
+        Pv_z_ref(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i+1),2);
+
+        int step_time_adj_calc = max(MPC_Stabilizer_time_adj_tick_x_mpc_, MPC_Stabilizer_time_adj_tick_y_mpc_);
+        bool nnext_step_prev_bool = (bool)(mpc_tick + mpc_synchro_hz*(i + 2 + step_time_adj_calc) > (2*t_total_const_ - t_dsp2_));
+
+        //zmp_time_calc_x_(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + 1 + (1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),0) + 0.04 - 0.03*(bool)(scenario_num_);
+        zmp_time_calc_x_(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + 1 + (1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),0) + 0.02 - 0.01*(bool)(scenario_num_);
+        zmp_time_calc_y_(i) = ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + 1 + (1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),1);
 
         if(i < N_step)
         {
-            Pv_dot_ref_mpc_(i,0) = (ref_zmp_mpc_(mpc_tick + mpc_synchro_hz*(i + N_plan_mpc + 1),0) - ref_zmp_mpc_(mpc_tick + mpc_synchro_hz*(i + N_plan_mpc + 0),0))/mpc_dt;
-            Pv_dot_ref_mpc_(i,1) = (ref_zmp_mpc_(mpc_tick + mpc_synchro_hz*(i + N_plan_mpc + 1),1) - ref_zmp_mpc_(mpc_tick + mpc_synchro_hz*(i + N_plan_mpc + 0),1))/mpc_dt;
+            Pv_dot_ref_mpc_(i,0) = (ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + N_plan_mpc + 1),0) - ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + N_plan_mpc + 0),0))/mpc_dt;
+            Pv_dot_ref_mpc_(i,1) = (ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + N_plan_mpc + 1),1) - ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + N_plan_mpc + 0),1))/mpc_dt;
+            Pv_dot_ref_mpc_(i,2) = (ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + N_plan_mpc + 1),2) - ref_vrp_mpc_(mpc_tick + mpc_synchro_hz*(i + N_plan_mpc + 0),2))/mpc_dt;
         }
 
         zmp_max_x_mpc_(i) = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1),0) + zmp_x_max;     
@@ -9816,98 +9742,889 @@ void AvatarController::IS_LIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, d
 
         zmp_max_y_mpc_(i) = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1),1) + zmp_y_max;
         zmp_min_y_mpc_(i) = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1),1) - zmp_y_min;
+
+        zmp_max_x_time_plan_mpc(i) = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1+(1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),0) + zmp_x_max;
+        zmp_min_x_time_plan_mpc(i) = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1+(1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),0) - zmp_x_min;
+        
+        zmp_max_y_time_plan_mpc(i) = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1+(1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),1) + zmp_y_max;
+        zmp_min_y_time_plan_mpc(i) = ref_zmp_wo_offset_mpc_(mpc_tick + mpc_synchro_hz*(i+1+(1 - nnext_step_prev_bool)*step_enable_bool_mpc_*step_time_adj_calc),1) - zmp_y_min;
     }
 
-    gcalc_plan_mpc_ = gxcalc_plan_mpc_*(Pvps_plan_mpc_*ssx_plan_mpc_*MPC_Planner_state_mpc_.segment(0,6) - Pv_x_ref)
-                    + gycalc_plan_mpc_*(Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_.segment(0,6) - Pv_y_ref);
+    gcalc_plan_mpc_ = gxcalc_plan_mpc_*(Pvps_plan_mpc_*ssx_plan_mpc_*MPC_Planner_state_mpc_ - zmp_time_calc_x_)
+                    + gycalc_plan_mpc_*(Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_ - zmp_time_calc_y_)
+                    + gzcalc_plan_mpc_*(Pvps_plan_mpc_*ssz_plan_mpc_*MPC_Planner_state_mpc_ - Pv_z_ref);
+
+    SQP_deldel_Qcalc_plan_mpc_ = Qcalc_plan_mpc_;
+    SQP_del_g_calc_plan_mpc_   = Qcalc_plan_mpc_*MPC_Planner_u_mpc_ + gcalc_plan_mpc_;
 
     QP_MPC_Planner_.EnableEqualityCondition(equality_condition_eps_);
-    QP_MPC_Planner_.UpdateMinProblem(Qcalc_plan_mpc_, gcalc_plan_mpc_);
+    QP_MPC_Planner_.UpdateMinProblem(SQP_deldel_Qcalc_plan_mpc_, SQP_del_g_calc_plan_mpc_);
     QP_MPC_Planner_.DeleteSubjectToAx();
     QP_MPC_Planner_.DeleteSubjectToX();
     
-    const_A_mpc_.setZero(2*N_plan_mpc + 3, 2*N_plan_mpc);
-    const_ub_mpc_.setZero(2*N_plan_mpc + 3, 1);
-    const_lb_mpc_.setZero(2*N_plan_mpc + 3, 1);
+    const_A_mpc_.setZero( const_num, input_num);
+    const_ub_mpc_.setZero(const_num, 1);
+    const_lb_mpc_.setZero(const_num, 1);
 
-    const_A_mpc_.block(0*N_plan_mpc, 0, 1*N_plan_mpc, 2*N_plan_mpc) = Pvpu_plan_mpc_*SUx_plan_mpc_;
-    const_A_mpc_.block(1*N_plan_mpc, 0, 1*N_plan_mpc, 2*N_plan_mpc) = Pvpu_plan_mpc_*SUy_plan_mpc_;
+    int constraint_index = 0;
+    int calc_index = 0;
+    int calc_index2 = 0;
+    ////VRP Constraint
+    Eigen::MatrixXd Si_mpc; Si_mpc.setZero(1, N_plan_mpc);
+    for(int i = 0; i < N_plan_mpc; i++)
+    {
+        const_SQP_phi_mpc_.setZero(input_num, input_num);
+        const_SQP_phi_mpc_calc_.setZero(input_num, input_num);
+        const_SQP_pi_mpc_.setZero(input_num, 1);
+        const_SQP_ri_mpc_.setZero(1, 1);
 
-    const_ub_mpc_.block(0*N_plan_mpc, 0, 1*N_plan_mpc, 1) = zmp_max_x_mpc_ - Pvps_plan_mpc_*ssx_plan_mpc_*MPC_Planner_state_mpc_.segment(0,6);
-    const_ub_mpc_.block(1*N_plan_mpc, 0, 1*N_plan_mpc, 1) = zmp_max_y_mpc_ - Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_.segment(0,6);
+        Si_mpc.setZero(1, N_plan_mpc);
+        Si_mpc(0, i) = 1;
 
-    const_lb_mpc_.block(0*N_plan_mpc, 0, 1*N_plan_mpc, 1) = zmp_min_x_mpc_ - Pvps_plan_mpc_*ssx_plan_mpc_*MPC_Planner_state_mpc_.segment(0,6);
-    const_lb_mpc_.block(1*N_plan_mpc, 0, 1*N_plan_mpc, 1) = zmp_min_y_mpc_ - Pvps_plan_mpc_*ssy_plan_mpc_*MPC_Planner_state_mpc_.segment(0,6);
+        //X max
+        const_SQP_phi_mpc_ = 0.5*(IS_FIPM_SQP_x_phi_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 3*N_plan_mpc)
+                                 +IS_FIPM_SQP_x_phi_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 3*N_plan_mpc).transpose());
+
+        const_SQP_pi_mpc_  = IS_FIPM_SQP_x_pi_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 3*N_state)*MPC_Planner_state_mpc_
+
+                           + IS_FIPM_SQP_x_pi2_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 1)
+
+                           - zmp_max_x_time_plan_mpc(i)*IS_FIPM_SQP_x_pi3_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 1);
+
+        const_SQP_ri_mpc_ = MPC_Planner_state_mpc_.transpose()*IS_FIPM_SQP_x_ri_N_plan_mpc_.block(calc_index2, 0, 3*N_state, 3*N_state)*MPC_Planner_state_mpc_
+                          
+                          + IS_FIPM_SQP_x_ri2_N_plan_mpc_.block(i, 0, 1, 3*N_state)*MPC_Planner_state_mpc_
+
+                          - zmp_max_x_time_plan_mpc(i)*IS_FIPM_SQP_x_ri3_N_plan_mpc_.block(i, 0, 1, 3*N_state)*MPC_Planner_state_mpc_
+                          
+                          - GRAVITY*b_*b_*zmp_max_x_time_plan_mpc(i)*MatrixXd::Identity(1,1);
+
+        const_SQP_hi_mpc_ = MPC_Planner_u_mpc_.transpose()*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_.transpose()*MPC_Planner_u_mpc_ + const_SQP_ri_mpc_;
+
+        const_A_mpc_.row(constraint_index) = (2*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_).transpose();
+        const_ub_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+        const_lb_mpc_.block(constraint_index, 0, 1, 1) = - 1e+3*MatrixXd::Identity(1,1);
+        constraint_index += 1;
+
+        //X min
+        const_SQP_phi_mpc_ = 0.5*(IS_FIPM_SQP_x_phi_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 3*N_plan_mpc)
+                                 +IS_FIPM_SQP_x_phi_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 3*N_plan_mpc).transpose());
+
+        const_SQP_pi_mpc_  = IS_FIPM_SQP_x_pi_N_plan_mpc_.block (calc_index, 0, 3*N_plan_mpc, 3*N_state)*MPC_Planner_state_mpc_
+
+                           + IS_FIPM_SQP_x_pi2_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 1)
+
+                           - zmp_min_x_time_plan_mpc(i)*IS_FIPM_SQP_x_pi3_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 1);
+
+        const_SQP_ri_mpc_  = MPC_Planner_state_mpc_.transpose()*IS_FIPM_SQP_x_ri_N_plan_mpc_.block(calc_index2, 0, 3*N_state, 3*N_state)*MPC_Planner_state_mpc_
+
+                           + IS_FIPM_SQP_x_ri2_N_plan_mpc_.block(i, 0, 1, 3*N_state)*MPC_Planner_state_mpc_
+
+                           - zmp_min_x_time_plan_mpc(i)*IS_FIPM_SQP_x_ri3_N_plan_mpc_.block(i, 0, 1, 3*N_state)*MPC_Planner_state_mpc_
+                          
+                           - GRAVITY*b_*b_*zmp_min_x_time_plan_mpc(i)*MatrixXd::Identity(1,1);
+
+        const_SQP_hi_mpc_  = MPC_Planner_u_mpc_.transpose()*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_.transpose()*MPC_Planner_u_mpc_ + const_SQP_ri_mpc_;
+
+        const_A_mpc_.row(constraint_index) = (2*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_).transpose();
+        const_ub_mpc_.block(constraint_index, 0, 1, 1) = + 1e+3*MatrixXd::Identity(1,1);
+        const_lb_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+        constraint_index += 1;
+
+        //Y direction
+        //Y max
+        const_SQP_phi_mpc_ = 0.5*(IS_FIPM_SQP_y_phi_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 3*N_plan_mpc)
+                                 +IS_FIPM_SQP_y_phi_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 3*N_plan_mpc).transpose());
+
+        const_SQP_pi_mpc_  = IS_FIPM_SQP_y_pi_N_plan_mpc_.block (calc_index, 0, 3*N_plan_mpc, 3*N_state)*MPC_Planner_state_mpc_
+
+                           + IS_FIPM_SQP_y_pi2_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 1)
+
+                           - zmp_max_y_time_plan_mpc(i)*IS_FIPM_SQP_y_pi3_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 1);
+
+        const_SQP_ri_mpc_  = MPC_Planner_state_mpc_.transpose()*IS_FIPM_SQP_y_ri_N_plan_mpc_.block(calc_index2, 0, 3*N_state, 3*N_state)*MPC_Planner_state_mpc_
+
+                           + IS_FIPM_SQP_y_ri2_N_plan_mpc_.block(i, 0, 1, 3*N_state)*MPC_Planner_state_mpc_
+
+                           - zmp_max_y_time_plan_mpc(i)*IS_FIPM_SQP_y_ri3_N_plan_mpc_.block(i, 0, 1, 3*N_state)*MPC_Planner_state_mpc_
+                          
+                           - GRAVITY*b_*b_*zmp_max_y_time_plan_mpc(i)*MatrixXd::Identity(1,1);
+
+        const_SQP_hi_mpc_  = MPC_Planner_u_mpc_.transpose()*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_.transpose()*MPC_Planner_u_mpc_ + const_SQP_ri_mpc_;
+
+        const_A_mpc_.row(constraint_index) = (2*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_).transpose();
+        const_ub_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+        const_lb_mpc_.block(constraint_index, 0, 1, 1) = - 1e+3*MatrixXd::Identity(1,1);
+        constraint_index += 1;
+
+        //Y min
+        const_SQP_phi_mpc_ = 0.5*(IS_FIPM_SQP_y_phi_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 3*N_plan_mpc)
+                                 +IS_FIPM_SQP_y_phi_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 3*N_plan_mpc).transpose());
+
+        const_SQP_pi_mpc_  = IS_FIPM_SQP_y_pi_N_plan_mpc_.block (calc_index, 0, 3*N_plan_mpc, 3*N_state)*MPC_Planner_state_mpc_
+
+                           + IS_FIPM_SQP_y_pi2_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 1)
+
+                           - zmp_min_y_time_plan_mpc(i)*IS_FIPM_SQP_y_pi3_N_plan_mpc_.block(calc_index, 0, 3*N_plan_mpc, 1);
+
+        const_SQP_ri_mpc_  = MPC_Planner_state_mpc_.transpose()*IS_FIPM_SQP_y_ri_N_plan_mpc_.block(calc_index2, 0, 3*N_state, 3*N_state)*MPC_Planner_state_mpc_
+
+                           + IS_FIPM_SQP_y_ri2_N_plan_mpc_.block(i, 0, 1, 3*N_state)*MPC_Planner_state_mpc_
+
+                           - zmp_min_y_time_plan_mpc(i)*IS_FIPM_SQP_y_ri3_N_plan_mpc_.block(i, 0, 1, 3*N_state)*MPC_Planner_state_mpc_
+                          
+                           - GRAVITY*b_*b_*zmp_min_y_time_plan_mpc(i)*MatrixXd::Identity(1,1);
+
+        const_SQP_hi_mpc_  = MPC_Planner_u_mpc_.transpose()*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_.transpose()*MPC_Planner_u_mpc_ + const_SQP_ri_mpc_;
+
+        const_A_mpc_.row(constraint_index) = (2*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_).transpose();
+        const_ub_mpc_.block(constraint_index, 0, 1, 1) = + 1e+3*MatrixXd::Identity(1,1);
+        const_lb_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+        constraint_index += 1;
+
+        calc_index  += 3*N_plan_mpc;
+        calc_index2 += 3*N_state;
+    }
 
     //IS EQ
-    Eigen::MatrixXd Const_b_eq_;  Const_b_eq_.setZero(2,1);
+    Eigen::MatrixXd Const_b_eq_;  Const_b_eq_.setZero(3,1);
 
     Const_b_eq_(0,0) = (w_/(1 - lambda_is_calc))*(MPC_Planner_state_mpc_(0) + MPC_Planner_state_mpc_(1)/w_ - MPC_Planner_state_mpc_(2))
                        -(pow(lambda_is_calc, N_plan_mpc)/(1 - pow(lambda_is_calc,N_step))*(b_IS_step_mpc_.transpose()*Pv_dot_ref_mpc_.col(0))(0,0));
     Const_b_eq_(1,0) = (w_/(1 - lambda_is_calc))*(MPC_Planner_state_mpc_(3) + MPC_Planner_state_mpc_(4)/w_ - MPC_Planner_state_mpc_(5))
                        -(pow(lambda_is_calc, N_plan_mpc)/(1 + pow(lambda_is_calc,N_step))*(b_IS_step_mpc_.transpose()*Pv_dot_ref_mpc_.col(1))(0,0));
+    Const_b_eq_(2,0) = (w_/(1 - lambda_is_calc))*(MPC_Planner_state_mpc_(6) + MPC_Planner_state_mpc_(7)/w_ - MPC_Planner_state_mpc_(8));
 
-    const_A_mpc_.row(2*N_plan_mpc + 0) = b_IS_plan_mpc_.transpose()*SUx_plan_mpc_;
-    const_A_mpc_.row(2*N_plan_mpc + 1) = b_IS_plan_mpc_.transpose()*SUy_plan_mpc_;
+    //X direction
+    const_SQP_phi_mpc_.setZero(input_num, input_num);
+    const_SQP_pi_mpc_ = (b_IS_plan_mpc_.transpose()*SUx_plan_mpc_).transpose();
+    const_SQP_ri_mpc_ = - Const_b_eq_.block(0, 0, 1, 1);
+    //const_SQP_hi_mpc_ = MPC_Planner_u_mpc_.transpose()*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_.transpose()*MPC_Planner_u_mpc_ + const_SQP_ri_mpc_;
+    const_SQP_hi_mpc_ = const_SQP_pi_mpc_.transpose()*MPC_Planner_u_mpc_ + const_SQP_ri_mpc_;
+    
+    //const_A_mpc_.row(constraint_index) = (2*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_).transpose();
+    const_A_mpc_.row(constraint_index) = (const_SQP_pi_mpc_).transpose();
+    const_ub_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+    const_lb_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+    constraint_index += 1;
+    //Y direction
+    const_SQP_phi_mpc_.setZero(input_num, input_num);
+    const_SQP_pi_mpc_ = (b_IS_plan_mpc_.transpose()*SUy_plan_mpc_).transpose();
+    const_SQP_ri_mpc_ = - Const_b_eq_.block(1, 0, 1, 1);
+    //const_SQP_hi_mpc_ = MPC_Planner_u_mpc_.transpose()*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_.transpose()*MPC_Planner_u_mpc_ + const_SQP_ri_mpc_;
+    const_SQP_hi_mpc_ = const_SQP_pi_mpc_.transpose()*MPC_Planner_u_mpc_ + const_SQP_ri_mpc_;
 
-    const_ub_mpc_.block(2*N_plan_mpc + 0, 0, 2, 1) = Const_b_eq_.block(0, 0, 2, 1);
-    const_lb_mpc_.block(2*N_plan_mpc + 0, 0, 2, 1) = Const_b_eq_.block(0, 0, 2, 1);
+    //const_A_mpc_.row(constraint_index) = (2*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_).transpose();
+    const_A_mpc_.row(constraint_index) = (const_SQP_pi_mpc_).transpose();
+    const_ub_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+    const_lb_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+    constraint_index += 1;
+    //Z direction
+    const_SQP_phi_mpc_.setZero(input_num, input_num);
+    const_SQP_pi_mpc_ = (b_IS_plan_mpc_.transpose()*SUz_plan_mpc_).transpose();
+    const_SQP_ri_mpc_ = - Const_b_eq_.block(2, 0, 1, 1);
+    //const_SQP_hi_mpc_ = MPC_Planner_u_mpc_.transpose()*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_.transpose()*MPC_Planner_u_mpc_ + const_SQP_ri_mpc_;
+    const_SQP_hi_mpc_ = const_SQP_pi_mpc_.transpose()*MPC_Planner_u_mpc_ + const_SQP_ri_mpc_;
+
+    //const_A_mpc_.row(constraint_index) = (2*const_SQP_phi_mpc_*MPC_Planner_u_mpc_ + const_SQP_pi_mpc_).transpose();
+    const_A_mpc_.row(constraint_index) = (const_SQP_pi_mpc_).transpose();
+    const_ub_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+    const_lb_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+    constraint_index += 1;
 
     QP_MPC_Planner_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
 
-    if(QP_MPC_Planner_.SolveQPoases(100, MPC_Planner_u_mpc_))
+    if(QP_MPC_Planner_.SolveQPoases(100, MPC_Planner_SQP_du_mpc_))
     {
-        if((walking_tick_mpc_ - mpc_synchro_hz - 20)%int(2*hz_) == 0)
-        { cout << "IS LIPM Planner MPC Solved" << endl;; }
-
-        Planner_State_Prev_mpc_.row(0).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcpu_plan_mpc_*SUx_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(1).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcvu_plan_mpc_*SUx_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(2).transpose() = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pvpu_plan_mpc_*SUx_plan_mpc_*MPC_Planner_u_mpc_;
-
-        Planner_State_Prev_mpc_.row(3).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcpu_plan_mpc_*SUy_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(4).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcvu_plan_mpc_*SUy_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(5).transpose() = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pvpu_plan_mpc_*SUy_plan_mpc_*MPC_Planner_u_mpc_;
+        //if((walking_tick_mpc_ - mpc_synchro_hz - 20)%int(2*hz_) == 0)
+        if((((walking_tick_mpc_ - int(mpc_synchro_hz) + 1)/int(mpc_synchro_hz))%60) == 0) //30hz
+        { cout << "IS FIPM Planner MPC Solved" << endl;; }
         
-        Planner_State_Prev_mpc_.row(6).transpose().setConstant(zc_mj_);
-        Planner_State_Prev_mpc_.row(7).transpose().setConstant(0.0);
-        Planner_State_Prev_mpc_.row(8).transpose().setConstant(zc_mj_);
+        MPC_Planner_u_mpc_ = MPC_Planner_u_mpc_ + MPC_Planner_SQP_du_mpc_;
 
-        MPC_Planner_state_mpc_.segment(0,3) = A_mpc_*MPC_Planner_state_mpc_.segment(0,3) + B_mpc_*(SUx_plan_mpc_*MPC_Planner_u_mpc_)(0);
-        MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*(SUy_plan_mpc_*MPC_Planner_u_mpc_)(0);
+        Planner_State_Prev_mpc_.row(0).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_.segment(0*N_plan_mpc, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(1).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_.segment(0*N_plan_mpc, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(2).transpose() = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_.segment(0*N_plan_mpc, N_plan_mpc);
+
+        Planner_State_Prev_mpc_.row(3).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_.segment(1*N_plan_mpc, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(4).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_.segment(1*N_plan_mpc, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(5).transpose() = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_.segment(1*N_plan_mpc, N_plan_mpc);
+
+        Planner_State_Prev_mpc_.row(6).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_.segment(2*N_plan_mpc, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(7).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_.segment(2*N_plan_mpc, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(8).transpose() = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_.segment(2*N_plan_mpc, N_plan_mpc);
+
+        MPC_Planner_state_mpc_.segment(0,3) = A_mpc_*MPC_Planner_state_mpc_.segment(0,3) + B_mpc_*MPC_Planner_u_mpc_(0*N_plan_mpc);
+        MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*MPC_Planner_u_mpc_(1*N_plan_mpc);
+        MPC_Planner_state_mpc_.segment(6,3) = A_mpc_*MPC_Planner_state_mpc_.segment(6,3) + B_mpc_*MPC_Planner_u_mpc_(2*N_plan_mpc);
+
+        MPC_Planner_u_mpc_sep_(0) = MPC_Planner_u_mpc_(0*N_plan_mpc);
+        MPC_Planner_u_mpc_sep_(1) = MPC_Planner_u_mpc_(1*N_plan_mpc);
+        MPC_Planner_u_mpc_sep_(2) = MPC_Planner_u_mpc_(2*N_plan_mpc);
     }
     else
     { 
-        cout << "IS LIPM Planner MPC Not Solved" << endl;
+        cout << "IS FIPM Planner MPC Not Solved" << endl;
         cout << int(walking_tick_mpc_ - 20)/mpc_synchro_hz << endl;
 
-        Planner_State_Prev_mpc_.row(0).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcpu_plan_mpc_*SUx_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(1).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcvu_plan_mpc_*SUx_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(2).transpose() = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pvpu_plan_mpc_*SUx_plan_mpc_*MPC_Planner_u_mpc_;
+        MPC_Planner_u_mpc_ = MPC_Planner_u_mpc_ + MPC_Planner_SQP_du_mpc_;
 
-        Planner_State_Prev_mpc_.row(3).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcpu_plan_mpc_*SUy_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(4).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcvu_plan_mpc_*SUy_plan_mpc_*MPC_Planner_u_mpc_;
-        Planner_State_Prev_mpc_.row(5).transpose() = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pvpu_plan_mpc_*SUy_plan_mpc_*MPC_Planner_u_mpc_;
-                
-        Planner_State_Prev_mpc_.row(6).transpose().setConstant(zc_mj_);
-        Planner_State_Prev_mpc_.row(7).transpose().setConstant(0.0);
-        Planner_State_Prev_mpc_.row(8).transpose().setConstant(zc_mj_);
+        Planner_State_Prev_mpc_.row(0).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_.segment(0*N_plan_mpc, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(1).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_.segment(0*N_plan_mpc, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(2).transpose() = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(0,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_.segment(0*N_plan_mpc, N_plan_mpc);
 
-        MPC_Planner_state_mpc_.segment(0,3) = A_mpc_*MPC_Planner_state_mpc_.segment(0,3) + B_mpc_*(SUx_plan_mpc_*MPC_Planner_u_mpc_)(0);
-        MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*(SUy_plan_mpc_*MPC_Planner_u_mpc_)(0);
+        Planner_State_Prev_mpc_.row(3).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_.segment(1*N_plan_mpc, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(4).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_.segment(1*N_plan_mpc, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(5).transpose() = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(3,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_.segment(1*N_plan_mpc, N_plan_mpc);
+
+        Planner_State_Prev_mpc_.row(6).transpose() = Pcps_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcpu_plan_mpc_*MPC_Planner_u_mpc_.segment(2*N_plan_mpc, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(7).transpose() = Pcvs_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pcvu_plan_mpc_*MPC_Planner_u_mpc_.segment(2*N_plan_mpc, N_plan_mpc);
+        Planner_State_Prev_mpc_.row(8).transpose() = Pvps_plan_mpc_*MPC_Planner_state_mpc_.segment(6,3) + Pvpu_plan_mpc_*MPC_Planner_u_mpc_.segment(2*N_plan_mpc, N_plan_mpc);
+
+        MPC_Planner_state_mpc_.segment(0,3) = A_mpc_*MPC_Planner_state_mpc_.segment(0,3) + B_mpc_*MPC_Planner_u_mpc_(0*N_plan_mpc);
+        MPC_Planner_state_mpc_.segment(3,3) = A_mpc_*MPC_Planner_state_mpc_.segment(3,3) + B_mpc_*MPC_Planner_u_mpc_(1*N_plan_mpc);
+        MPC_Planner_state_mpc_.segment(6,3) = A_mpc_*MPC_Planner_state_mpc_.segment(6,3) + B_mpc_*MPC_Planner_u_mpc_(2*N_plan_mpc);
+
+        MPC_Planner_u_mpc_sep_(0) = MPC_Planner_u_mpc_(0*N_plan_mpc);
+        MPC_Planner_u_mpc_sep_(1) = MPC_Planner_u_mpc_(1*N_plan_mpc);
+        MPC_Planner_u_mpc_sep_(2) = MPC_Planner_u_mpc_(2*N_plan_mpc);
     }
 
-    e_mpc_planner_data << setprecision(10)
-                       << Pv_x_ref(0)               << "," << Pv_y_ref(0)               << "," << 0 <<","
-                       << MPC_Planner_state_mpc_(0) << "," << MPC_Planner_state_mpc_(3) << "," << 0 <<","
-                       << MPC_Planner_state_mpc_(1) << "," << MPC_Planner_state_mpc_(4) << "," << 0 <<","
-                       << MPC_Planner_state_mpc_(2) << "," << MPC_Planner_state_mpc_(5) << "," << 0 <<","
-                       << zmp_max_x_mpc_(0)         << "," << zmp_max_y_mpc_(0)         << "," << 0 <<","
+    e_mpc_planner_data << N_plan_mpc                << "," << walking_tick_mpc_         << "," << current_step_num_mpc_     << ","
+                       << Pv_x_ref(0)               << "," << Pv_y_ref(0)               << "," << Pv_z_ref(0)               << ","
+                       << MPC_Planner_state_mpc_(0) << "," << MPC_Planner_state_mpc_(3) << "," << MPC_Planner_state_mpc_(6) << ","
+                       << MPC_Planner_state_mpc_(1) << "," << MPC_Planner_state_mpc_(4) << "," << MPC_Planner_state_mpc_(7) << ","
+                       << MPC_Planner_state_mpc_(2) << "," << MPC_Planner_state_mpc_(5) << "," << MPC_Planner_state_mpc_(8) << ","
+                       << zmp_max_x_mpc_(0)         << "," << zmp_max_y_mpc_(0)         << "," << com_start_tick_mpc_       << ","
                        << endl;
 
-    e_tmp_graph4 << setprecision(10) << Pv_y_ref.transpose() << endl;
-    e_tmp_graph5 << setprecision(10) << Planner_State_Prev_mpc_.row(3) << endl;
-    e_tmp_graph6 << setprecision(10) << Planner_State_Prev_mpc_.row(5) << endl;
-    e_tmp_graph2 << setprecision(10) << zmp_max_y_mpc_.transpose() << endl;
+    Eigen::VectorXd data_save_calc; data_save_calc.setZero(3*N_plan_mpc);
+    data_save_calc << Pv_x_ref, Pv_y_ref, Pv_z_ref;
+    e_tmp_graph2 << data_save_calc.transpose() << endl;
+    data_save_calc << zmp_time_calc_x_, zmp_time_calc_y_, 0*zmp_time_calc_y_;
+    e_tmp_graph3 << data_save_calc.transpose() << endl;
+    data_save_calc << Planner_State_Prev_mpc_.row(0).transpose(), Planner_State_Prev_mpc_.row(3).transpose(), Planner_State_Prev_mpc_.row(6).transpose();
+    e_tmp_graph4 << data_save_calc.transpose() << endl; 
+    data_save_calc << Planner_State_Prev_mpc_.row(2).transpose(), Planner_State_Prev_mpc_.row(5).transpose(), Planner_State_Prev_mpc_.row(8).transpose();
+    e_tmp_graph5 << data_save_calc.transpose() << endl;
+    data_save_calc << zmp_max_x_mpc_, zmp_max_y_mpc_, 0*zmp_max_y_mpc_;
+    e_tmp_graph6 << data_save_calc.transpose() << endl;
+    data_save_calc << zmp_max_x_time_plan_mpc, zmp_max_y_time_plan_mpc, 0*zmp_max_y_time_plan_mpc;
+    e_tmp_graph7 << data_save_calc.transpose() << endl;
+}
+
+void AvatarController::IS_LIPM_DCM_Stabilizer_MPC(double mpc_freq, double preview_window)
+{
+    double Q_dcm_x, Q_dcm_y, Q_dcm_z, R_dcm_x, R_dcm_y, R_dcm_z, R_dalp, R_df_x, R_df_y;
+
+    Q_dcm_x = 1e-0; R_dcm_x = 1e-2; R_dalp = 1e+1; R_df_x = 1e+1;
+    Q_dcm_y = 1e-0; R_dcm_y = 1e-3;                R_df_y = 1e+1; //need tuning 1e+2 - 1e+3
+    Q_dcm_z = 9e-1; R_dcm_z = 1e-1; //for 0.9 step time
+
+    if(walking_tick_mpc_ < t_temp_)
+    {
+        R_dcm_y = 1e-2;
+    }
+
+    int mpc_tick = walking_tick_mpc_ - com_start_tick_mpc_;
+    double MPC_synchro_hz_ = 2000/mpc_freq;
+    int N_stab_mpc = preview_window*mpc_freq;
+    int N_step = 1.0*mpc_freq;
+    int N_state = 3;
+    double dt_stab_mpc = 1/mpc_freq;   
+
+    double lambda_is_calc = exp(-w_*dt_stab_mpc);
+
+    int input_num = 2*N_stab_mpc       + 1*step_time_adj_candidate_num_  + 2          + 2*step_time_adj_candidate_num_;
+    //              ZMP                  alpha                             delf         aux
+    int const_num = 2*N_stab_mpc  + 2  + 1*step_time_adj_candidate_num_  + 1          + 2*step_time_adj_candidate_num_  + 2;
+    //              ZMP two sided   IS   alpha min max                     alpha sum    alpha delf aux                    delf min max
+    //In LIPM the ZMP constraint is linear, so one row carries both bounds: 2*N instead of 4*N
+
+    if(MPC_first_loop_ == 0)
+    {      
+        Cdp_mpc_.resize(1,N_state);
+        Cdp_mpc_ << 1, 1/w_, 0;
+
+        Pdps_stab_mpc_.resize(N_stab_mpc, N_state);
+        Pcps_stab_mpc_.resize(N_stab_mpc, N_state);
+        Pcvs_stab_mpc_.resize(N_stab_mpc, N_state);
+        Pvps_stab_mpc_.resize(N_stab_mpc, N_state);
+
+        Eigen::MatrixXd Ps_calc;
+        Ps_calc.resize(N_state,N_state);
+        Ps_calc = A_mpc_;
+        
+        Pdpu_stab_mpc_.setZero(N_stab_mpc, N_stab_mpc);
+        Pcpu_stab_mpc_.setZero(N_stab_mpc, N_stab_mpc);
+        Pcvu_stab_mpc_.setZero(N_stab_mpc, N_stab_mpc);
+        Pvpu_stab_mpc_.setZero(N_stab_mpc, N_stab_mpc);
+        
+        Eigen::MatrixXd Pu_calc;
+        Pu_calc.setZero(N_state,N_stab_mpc);
+        
+        for(int i = 0; i < N_stab_mpc; i++)
+        {
+            Pdps_stab_mpc_.row(i) = Cdp_mpc_*Ps_calc;
+            Pcps_stab_mpc_.row(i) = Ccp_mpc_*Ps_calc;
+            Pcvs_stab_mpc_.row(i) = Ccv_mpc_*Ps_calc;
+            Pvps_stab_mpc_.row(i) = Cvp_mpc_*Ps_calc;
+            Ps_calc = Ps_calc*A_mpc_;
+
+            Pu_calc.col(i) = B_mpc_;
+            Pdpu_stab_mpc_.row(i) = Cdp_mpc_*Pu_calc;
+            Pcpu_stab_mpc_.row(i) = Ccp_mpc_*Pu_calc;
+            Pcvu_stab_mpc_.row(i) = Ccv_mpc_*Pu_calc;
+            Pvpu_stab_mpc_.row(i) = Cvp_mpc_*Pu_calc;
+            Pu_calc = A_mpc_*Pu_calc;
+        }
+
+        QP_MPC_Stabilizer_.InitializeProblemSize(input_num, const_num);
+
+        Qmat_stab_mpc_Q_.resize(N_stab_mpc, N_stab_mpc); //DCM
+        Qmat_stab_mpc_Q_.setIdentity();
+        
+        Qmat_stab_mpc_R_.resize(N_stab_mpc, N_stab_mpc); //VRP
+        Qmat_stab_mpc_R_.setIdentity();
+        
+        Qmat_stab_mpc_alp_.resize(step_time_adj_candidate_num_, step_time_adj_candidate_num_);
+        Qmat_stab_mpc_alp_.setIdentity();
+
+        Qcalc_stab_mpc_.setZero(input_num, input_num);
+
+        gcalc_stab_mpc_.setZero(input_num, 1);
+        gxpcalc_stab_mpc_.setZero(input_num, N_stab_mpc);
+        gypcalc_stab_mpc_.setZero(input_num, N_stab_mpc);
+
+        MPC_Stabilizer_u_mpc_.setZero(input_num); // VRP, delf, eps
+
+        MPC_Stabilizer_SQP_du_mpc_.setZero(input_num);
+
+        MPC_Stabilizer_alpha_mpc_.setZero(step_time_adj_candidate_num_);
+        MPC_Stabilizer_alpha_mpc_(0) = 1;
+
+        MPC_Stabilizer_aux_mpc_.setZero(2*step_time_adj_candidate_num_);
+        MPC_Stabilizer_aux_mpc_x_.setZero(step_time_adj_candidate_num_);
+        MPC_Stabilizer_aux_mpc_y_.setZero(step_time_adj_candidate_num_);
+
+        MPC_Stabilizer_delf_mpc_.setZero(2);
+        MPC_Stabilizer_delf_mpc_x_.setZero(1);
+        MPC_Stabilizer_delf_mpc_y_.setZero(1);
+
+        ssx_stab_mpc_ = ssx_plan_mpc_;
+        ssy_stab_mpc_ = ssy_plan_mpc_;
+
+        int input_index_calc = 0;
+
+        SUp_stab_mpc_.setZero(2*N_stab_mpc, input_num);
+        SUp_stab_mpc_.block  (0, input_index_calc, 2*N_stab_mpc, 2*N_stab_mpc) = MatrixXd::Identity(2*N_stab_mpc, 2*N_stab_mpc);
+
+        SUpx_stab_mpc_.setZero(N_stab_mpc, 2*N_stab_mpc);
+        SUpx_stab_mpc_.block  (0, 0*N_stab_mpc, N_stab_mpc, N_stab_mpc) = MatrixXd::Identity(N_stab_mpc, N_stab_mpc);
+        SUpxp_stab_mpc_ = SUpx_stab_mpc_*SUp_stab_mpc_;
+        SUpy_stab_mpc_.setZero(N_stab_mpc, 2*N_stab_mpc);
+        SUpy_stab_mpc_.block  (0, 1*N_stab_mpc, N_stab_mpc, N_stab_mpc) = MatrixXd::Identity(N_stab_mpc, N_stab_mpc);
+        SUpyp_stab_mpc_ = SUpy_stab_mpc_*SUp_stab_mpc_;
+
+        input_index_calc += 2*N_stab_mpc;
+
+        cout << "Selection Matrix ZMP Complete" << endl;
+        cout << "input_num: " << input_num << endl;
+        cout << "input_index_calc: " << input_index_calc << endl << endl;
+
+        SUalp_stab_mpc_.setZero(1*step_time_adj_candidate_num_, input_num);
+        SUalp_stab_mpc_.block  (0, input_index_calc, 1*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_) = MatrixXd::Identity(1*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_);
+
+        input_index_calc += 1*step_time_adj_candidate_num_;
+
+        cout << "Selection Matrix alpha Complete" << endl;
+        cout << "input_num: " << input_num << endl;
+        cout << "input_index_calc: " << input_index_calc << endl << endl;
+
+        SUf_stab_mpc_.setZero(2, input_num);
+        SUf_stab_mpc_.block  (0, input_index_calc, 2, 2) = MatrixXd::Identity(2, 2);
+
+        SUfx_stab_mpc_.setZero(1, 2);
+        SUfx_stab_mpc_.block  (0, 0*1, 1, 1) = MatrixXd::Identity(1, 1);
+        SUfy_stab_mpc_.setZero(1, 2);
+        SUfy_stab_mpc_.block  (0, 1*1, 1, 1) = MatrixXd::Identity(1, 1);
+
+        SUfxf_stab_mpc_ = SUfx_stab_mpc_*SUf_stab_mpc_;
+        SUfyf_stab_mpc_ = SUfy_stab_mpc_*SUf_stab_mpc_;
+
+        input_index_calc += 2*1;
+
+        cout << "Selection Matrix delf Complete" << endl;
+        cout << "input_num: "                    << input_num        << endl;
+        cout << "input_index_calc: "             << input_index_calc << endl << endl;
+
+        SUaux_stab_mpc_.setZero(2*step_time_adj_candidate_num_, input_num);
+        SUaux_stab_mpc_.block  (0, input_index_calc, 2*step_time_adj_candidate_num_, 2*step_time_adj_candidate_num_) = MatrixXd::Identity(2*step_time_adj_candidate_num_, 2*step_time_adj_candidate_num_);
+
+        SUaux_x_stab_mpc_.setZero(1*step_time_adj_candidate_num_, 2*step_time_adj_candidate_num_);
+        SUaux_x_stab_mpc_.block  (0, 0*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_) = MatrixXd::Identity(1*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_);
+        SUaux_y_stab_mpc_.setZero(1*step_time_adj_candidate_num_, 2*step_time_adj_candidate_num_);
+        SUaux_y_stab_mpc_.block  (0, 1*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_) = MatrixXd::Identity(1*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_);
+
+        input_index_calc += 2*step_time_adj_candidate_num_;
+
+        cout << "Selection Matrix aux Complete" << endl;
+        cout << "input_num: " << input_num << endl;
+        cout << "input_index_calc: " << input_index_calc << endl << endl;
+
+        Qcalc_stab_mpc_ = SUp_stab_mpc_.transpose()*(SUpx_stab_mpc_.transpose()*(Pdpu_stab_mpc_.transpose()*Q_dcm_x*MatrixXd::Identity(N_stab_mpc, N_stab_mpc)*Pdpu_stab_mpc_ + R_dcm_x*Qmat_stab_mpc_R_)*SUpx_stab_mpc_
+                                                    +SUpy_stab_mpc_.transpose()*(Pdpu_stab_mpc_.transpose()*Q_dcm_y*MatrixXd::Identity(N_stab_mpc, N_stab_mpc)*Pdpu_stab_mpc_ + R_dcm_y*Qmat_stab_mpc_R_)*SUpy_stab_mpc_)*SUp_stab_mpc_
+
+                        + SUalp_stab_mpc_.transpose()*R_dalp*Qmat_stab_mpc_alp_*SUalp_stab_mpc_
+
+                        + SUf_stab_mpc_.transpose()*(SUfx_stab_mpc_.transpose()*R_df_x*SUfx_stab_mpc_
+                                                    +SUfy_stab_mpc_.transpose()*R_df_y*SUfy_stab_mpc_)*SUf_stab_mpc_;
+                         
+        gxpcalc_stab_mpc_ = SUp_stab_mpc_.transpose()*SUpx_stab_mpc_.transpose()*Pdpu_stab_mpc_.transpose()*Q_dcm_x*MatrixXd::Identity(N_stab_mpc, N_stab_mpc);
+        gypcalc_stab_mpc_ = SUp_stab_mpc_.transpose()*SUpy_stab_mpc_.transpose()*Pdpu_stab_mpc_.transpose()*Q_dcm_y*MatrixXd::Identity(N_stab_mpc, N_stab_mpc);
+
+        gxdfcalc_stab_mpc_ = SUf_stab_mpc_.transpose()*SUfx_stab_mpc_.transpose()*R_df_x*MatrixXd::Identity(1, 1);
+        gydfcalc_stab_mpc_ = SUf_stab_mpc_.transpose()*SUfy_stab_mpc_.transpose()*R_df_y*MatrixXd::Identity(1, 1);
+
+        gdalpcalc_stab_mpc_ = SUalp_stab_mpc_.transpose()*R_dalp*Qmat_stab_mpc_alp_;
+
+        Sf1_stab_mpc_.setZero(N_stab_mpc, step_time_adj_candidate_num_);
+
+        //Kept at 3 so the main thread consumes FIPM and LIPM identically.
+        //LIPM has no z input, so element 2 (z VRP rate) stays 0 and the main-thread z state holds at (zc, 0, zc).
+        MPC_Stabilizer_u_mpc_sep_.setZero(3);
+
+        //LIPM: p_vrp,xy == p_zmp,xy, so the ZMP constraint is linear in the decision variables.
+        //Only the Sf1(step adjustment) part changes every tick, so cache the rest here.
+        Azmpx_stab_mpc_ = Pvpu_stab_mpc_*SUpxp_stab_mpc_;
+        Azmpy_stab_mpc_ = Pvpu_stab_mpc_*SUpyp_stab_mpc_;
+
+        Pvpsx_stab_mpc_ = Pvps_stab_mpc_*ssx_stab_mpc_;
+        Pvpsy_stab_mpc_ = Pvps_stab_mpc_*ssy_stab_mpc_;
+
+        cout << "ZMP Constraint Matrix Complete" << endl;
+        cout << "Azmpx_stab_mpc_: " << Azmpx_stab_mpc_.rows() << " x " << Azmpx_stab_mpc_.cols() << endl;
+        cout << "Pvpsx_stab_mpc_: " << Pvpsx_stab_mpc_.rows() << " x " << Pvpsx_stab_mpc_.cols() << endl << endl;
+
+        const_SQP_phi_mpc_.setZero(input_num, input_num);
+        const_SQP_pi_mpc_.setZero(input_num, 1);
+        const_SQP_ri_mpc_.setZero(1, 1);
+
+        MPC_first_loop_ = 1;
+        cout << "Initialiazation of IS LIPM DCM MPC is completed" << endl;
+    }
+
+    Sf1_stab_mpc_.setZero();
+
+    double step_x_norm = foot_step_support_frame_mpc_(current_step_num_mpc_, 0);
+    double step_y_norm = foot_step_support_frame_mpc_(current_step_num_mpc_, 1);
+
+    if(mpc_tick < hz_/mpc_freq)
+    {
+        MPC_Stabilizer_delf_mpc_x_(0) = step_x_norm;
+        MPC_Stabilizer_delf_mpc_y_(0) = step_y_norm;
+        MPC_Stabilizer_delf_mpc_ << MPC_Stabilizer_delf_mpc_x_, MPC_Stabilizer_delf_mpc_y_;
+
+        MPC_Stabilizer_alpha_mpc_.setZero();
+        MPC_Stabilizer_alpha_mpc_(0) = 1;
+
+        MPC_Stabilizer_aux_mpc_x_ = MPC_Stabilizer_alpha_mpc_*MPC_Stabilizer_delf_mpc_x_;
+        MPC_Stabilizer_aux_mpc_y_ = MPC_Stabilizer_alpha_mpc_*MPC_Stabilizer_delf_mpc_y_;
+        MPC_Stabilizer_aux_mpc_ << MPC_Stabilizer_aux_mpc_x_, MPC_Stabilizer_aux_mpc_y_;
+    }
+
+    step_enable_bool_mpc_          = (bool)((mpc_tick + com_start_tick_mpc_ > t_temp_- (t_dsp2_const_ + step_enable_fix_time_pre_*hz_))&&(mpc_tick                   < (1 - (bool)(current_step_num_mpc_))*t_temp_ + t_total_const_ - t_dsp2_const_ - step_enable_time_fwd_*hz_ - step_enable_fix_time_pre_*hz_));
+    step_enable_bool_one_tick_mpc_ = (bool)((mpc_tick + com_start_tick_mpc_ > t_temp_- (t_dsp2_const_ + step_enable_fix_time_pre_*hz_))&&(mpc_tick + MPC_synchro_hz_ < (1 - (bool)(current_step_num_mpc_))*t_temp_ + t_total_const_ - t_dsp2_const_ - step_enable_time_fwd_*hz_ - step_enable_fix_time_pre_*hz_));
+
+    Eigen::VectorXd data_save_calc; data_save_calc.setZero(2*N_stab_mpc);
+    data_save_calc << zmp_max_x_mpc_.segment(0, N_stab_mpc), zmp_max_y_mpc_.segment(0, N_stab_mpc);
+    e_tmp_graph15 << data_save_calc.transpose() << endl;
+
+    for(int i = 0; i < N_stab_mpc; i++)
+    {
+        for(int j = 0; j < 1; j++)
+        { 
+            int dsp_length_calc           = int((t_dsp1_const_ + t_dsp2_const_)/MPC_synchro_hz_ + 0.5);
+            int next_step_start_prev_tick = max(ceil(((j+1)*((1 - (bool)(current_step_num_mpc_))*t_temp_ + t_total_const_ - t_dsp2_const_) - mpc_tick)/MPC_synchro_hz_), 0.0);
+            bool  next_step_prev_bool     = (bool)(mpc_tick + MPC_synchro_hz_*(i + 2) > ((1 - (bool)(current_step_num_mpc_))*t_temp_ + (j + 1)*t_total_mpc_ - t_dsp2_const_));
+            bool nnext_step_prev_bool     = (bool)(mpc_tick + MPC_synchro_hz_*(i + 2) > ((1 - (bool)(current_step_num_mpc_))*t_temp_ + (j + 2)*t_total_mpc_ - t_dsp2_const_));
+
+            if(walking_tick_ < t_temp_)
+            {
+                next_step_prev_bool       = (bool)(mpc_tick + MPC_synchro_hz_*(i + 1) > ((1 - (bool)(current_step_num_mpc_))*t_temp_ + (j + 1)*t_total_mpc_ - t_dsp2_const_));
+            }
+
+            if((walking_tick_mpc_ > t_temp_ - (t_dsp2_const_ + step_enable_fix_time_pre_*hz_)) && (next_step_start_prev_tick < N_stab_mpc))
+            {
+                Sf1_stab_mpc_(i,0) = step_enable_bool_mpc_* next_step_prev_bool*(zmp_max_y_mpc_(i) - zmp_max_y_mpc_(int(t_dsp1_const_/MPC_synchro_hz_)))/(MPC_Stabilizer_delf_mpc_y_(0));
+                if(walking_tick_mpc_ < t_temp_)
+                {
+                    Sf1_stab_mpc_(i,0) = step_enable_bool_mpc_* next_step_prev_bool*(zmp_max_y_mpc_(i) - zmp_max_y_mpc_(int(t_dsp1_const_/MPC_synchro_hz_) + step_time_adj_candidate_num_))/(MPC_Stabilizer_delf_mpc_y_(0));
+                }
+                zmp_max_x_mpc_(i)  = step_enable_bool_mpc_*(next_step_prev_bool* zmp_max_x_mpc_(max(0, next_step_start_prev_tick - 2)) + (1 - next_step_prev_bool)*zmp_max_x_mpc_(i)) + (1 - step_enable_bool_mpc_)*zmp_max_x_mpc_(i);
+                zmp_min_x_mpc_(i)  = step_enable_bool_mpc_*(next_step_prev_bool* zmp_min_x_mpc_(max(0, next_step_start_prev_tick - 2)) + (1 - next_step_prev_bool)*zmp_min_x_mpc_(i)) + (1 - step_enable_bool_mpc_)*zmp_min_x_mpc_(i);
+                zmp_max_y_mpc_(i)  = step_enable_bool_mpc_*(next_step_prev_bool* zmp_max_y_mpc_(max(0, next_step_start_prev_tick - 2)) + (1 - next_step_prev_bool)*zmp_max_y_mpc_(i)) + (1 - step_enable_bool_mpc_)*zmp_max_y_mpc_(i);
+                zmp_min_y_mpc_(i)  = step_enable_bool_mpc_*(next_step_prev_bool* zmp_min_y_mpc_(max(0, next_step_start_prev_tick - 2)) + (1 - next_step_prev_bool)*zmp_min_y_mpc_(i)) + (1 - step_enable_bool_mpc_)*zmp_min_y_mpc_(i);
+            }
+        }
+    }
+
+    for(int i = 1; i < step_time_adj_candidate_num_; i++)
+    {
+        Sf1_stab_mpc_.col(i) << Sf1_stab_mpc_.col(i-1).segment(1, N_stab_mpc - 1), min((Sf1_stab_mpc_(N_stab_mpc - 1, i-1) + (Sf1_stab_mpc_(N_stab_mpc - 1, i-1) - Sf1_stab_mpc_(N_stab_mpc - 2, i-1))), 1.0);
+    }
+
+e_tmp_graph16 << Sf1_stab_mpc_.col(0).transpose() << endl;
+
+data_save_calc << zmp_max_x_mpc_.segment(0, N_stab_mpc), zmp_max_y_mpc_.segment(0, N_stab_mpc);
+e_tmp_graph24 << data_save_calc.transpose() << endl;
+
+    Eigen::VectorXd dcm_refx, dcm_refy;
+    dcm_refx.setZero(N_stab_mpc), dcm_refy.setZero(N_stab_mpc);
+
+    dcm_refx = Planner_State_Prev_mpc_.block(0, 0, 1, N_stab_mpc).transpose() + b_*Planner_State_Prev_mpc_.block(1, 0, 1, N_stab_mpc).transpose();
+    dcm_refy = Planner_State_Prev_mpc_.block(3, 0, 1, N_stab_mpc).transpose() + b_*Planner_State_Prev_mpc_.block(4, 0, 1, N_stab_mpc).transpose();
+
+    MPC_Stabilizer_state_mpc_(0) = com_measured_mpc_(0);
+    MPC_Stabilizer_state_mpc_(1) = com_dot_measured_mpc_(0);
+    MPC_Stabilizer_state_mpc_(3) = com_measured_mpc_(1);
+    MPC_Stabilizer_state_mpc_(4) = com_dot_measured_mpc_(1);
+
+    gcalc_stab_mpc_ = gxpcalc_stab_mpc_  *(Pdps_stab_mpc_*ssx_stab_mpc_*MPC_Stabilizer_state_mpc_ - dcm_refx)
+                     +gypcalc_stab_mpc_  *(Pdps_stab_mpc_*ssy_stab_mpc_*MPC_Stabilizer_state_mpc_ - dcm_refy)
+                    
+                     +gdalpcalc_stab_mpc_*(                                                       - MPC_Stabilizer_alpha_mpc_)
+
+                     +gxdfcalc_stab_mpc_ *(                                                       - MPC_Stabilizer_delf_mpc_x_)
+                     +gydfcalc_stab_mpc_ *(                                                       - MPC_Stabilizer_delf_mpc_y_);
+
+    SQP_deldel_Qcalc_stab_mpc_ = Qcalc_stab_mpc_;
+
+    //int sqp_iter = 2;
+    int sqp_iter = 4;
+
+    const_A_mpc_.setZero(const_num, input_num);
+    const_lb_mpc_.setZero(const_num, 1);
+    const_ub_mpc_.setZero(const_num, 1);
+
+    Eigen::MatrixXd prev_state;    prev_state.setZero(6,N_stab_mpc);
+    Eigen::MatrixXd prev_zmp;      prev_zmp.setZero(2, N_stab_mpc);
+    Eigen::VectorXd prev_lambda;   prev_lambda.setZero(N_stab_mpc);
+    Eigen::MatrixXd zmp_bound;     zmp_bound.setZero(2, N_stab_mpc);
+
+    //LIPM keeps a constant contact rate: lambda == g/z_c == w^2 over the whole horizon
+    prev_lambda.setConstant(w_*w_);
+
+    //ZMP constraint blocks (linear in u, rebuilt every SQP iteration because u moves)
+    Eigen::MatrixXd A_zmp_x, A_zmp_y;
+    Eigen::VectorXd g_zmp_x, g_zmp_y;
+
+    bool sqp_ok = true;
+
+    for(int s = 0; s < sqp_iter; s++)
+    {
+        std::chrono::steady_clock::time_point t11 = std::chrono::steady_clock::now();
+
+        SQP_del_g_calc_stab_mpc_   = Qcalc_stab_mpc_*MPC_Stabilizer_u_mpc_ + gcalc_stab_mpc_;
+
+        QP_MPC_Stabilizer_.EnableEqualityCondition(equality_condition_eps_);
+        QP_MPC_Stabilizer_.UpdateMinProblem(SQP_deldel_Qcalc_stab_mpc_, SQP_del_g_calc_stab_mpc_);
+        QP_MPC_Stabilizer_.DeleteSubjectToAx();
+        QP_MPC_Stabilizer_.DeleteSubjectToX();
+
+        int constraint_index = 0;
+
+        ////ZMP Constraint
+        std::chrono::steady_clock::time_point t12 = std::chrono::steady_clock::now();
+        if(s == 0)
+        {
+            e_mpc_time_graph3 << std::chrono::duration_cast<std::chrono::microseconds>(t12 - t11).count()*1e-6 << ",";
+        }
+
+        //ZMP(=VRP) Constraint : LIPM makes it linear in u, so the whole horizon is one block per axis.
+        //The step adjustment shifts the bound by Sf1*aux, which is itself a decision variable.
+        A_zmp_x = Azmpx_stab_mpc_ - Sf1_stab_mpc_*SUaux_x_stab_mpc_*SUaux_stab_mpc_;
+        A_zmp_y = Azmpy_stab_mpc_ - Sf1_stab_mpc_*SUaux_y_stab_mpc_*SUaux_stab_mpc_;
+
+        g_zmp_x = A_zmp_x*MPC_Stabilizer_u_mpc_ + Pvpsx_stab_mpc_*MPC_Stabilizer_state_mpc_;
+        g_zmp_y = A_zmp_y*MPC_Stabilizer_u_mpc_ + Pvpsy_stab_mpc_*MPC_Stabilizer_state_mpc_;
+
+        const_A_mpc_.block (constraint_index, 0, N_stab_mpc, input_num) = A_zmp_x;
+        const_ub_mpc_.block(constraint_index, 0, N_stab_mpc, 1)         = zmp_max_x_mpc_.segment(0, N_stab_mpc) - g_zmp_x;
+        const_lb_mpc_.block(constraint_index, 0, N_stab_mpc, 1)         = zmp_min_x_mpc_.segment(0, N_stab_mpc) - g_zmp_x;
+        constraint_index += N_stab_mpc;
+
+        const_A_mpc_.block (constraint_index, 0, N_stab_mpc, input_num) = A_zmp_y;
+        const_ub_mpc_.block(constraint_index, 0, N_stab_mpc, 1)         = zmp_max_y_mpc_.segment(0, N_stab_mpc) - g_zmp_y;
+        const_lb_mpc_.block(constraint_index, 0, N_stab_mpc, 1)         = zmp_min_y_mpc_.segment(0, N_stab_mpc) - g_zmp_y;
+        constraint_index += N_stab_mpc;
+
+        std::chrono::steady_clock::time_point t13 = std::chrono::steady_clock::now();
+        if(s == 0)
+        {
+            e_mpc_time_graph3 << std::chrono::duration_cast<std::chrono::microseconds>(t13 - t12).count()*1e-6 << ",";
+        }
+
+        //IS equality
+        Eigen::MatrixXd b_IS_stab_mpc; b_IS_stab_mpc.resize(N_stab_mpc,1); b_IS_stab_mpc.col(0) = b_IS_plan_mpc_.col(0).segment(0,N_stab_mpc);
+        //Pre planned Tail
+        Eigen::MatrixXd Const_b_eq; Const_b_eq.setZero(2,1);
+        Const_b_eq(0,0) = -(w_/(1 - lambda_is_calc))*(MPC_Stabilizer_state_mpc_(0) + MPC_Stabilizer_state_mpc_(1)/w_ - MPC_Stabilizer_state_mpc_(2));
+        //Const_b_eq(0,0) = -(w_/(1 - lambda_is_calc))*(MPC_Stabilizer_state_mpc_(0) + MPC_Stabilizer_state_mpc_(1)/w_ - MPC_Stabilizer_state_mpc_(2))
+        //                  +(pow(lambda_is_calc, N_stab_mpc)/(1 - pow(lambda_is_calc, N_step))*(b_IS_step_mpc_.transpose()*Pv_dot_ref_mpc_.col(0))(0,0));
+        Const_b_eq(1,0) = -(w_/(1 - lambda_is_calc))*(MPC_Stabilizer_state_mpc_(3) + MPC_Stabilizer_state_mpc_(4)/w_ - MPC_Stabilizer_state_mpc_(5))
+                          +(pow(lambda_is_calc, N_stab_mpc)/(1 + pow(lambda_is_calc, N_step))*(b_IS_step_mpc_.transpose()*Pv_dot_ref_mpc_.col(1))(0,0));
+
+        const_SQP_phi_mpc_.setZero(input_num, input_num);
+        //const_SQP_pi_mpc_ = (b_IS_stab_mpc.transpose()*SUpx_stab_mpc_*SUp_stab_mpc_).transpose();
+        const_SQP_pi_mpc_ = SUpxp_stab_mpc_.transpose()*b_IS_stab_mpc;
+        const_SQP_ri_mpc_ = Const_b_eq.block(0, 0, 1, 1);
+
+        //const_SQP_hi_mpc_ = MPC_Stabilizer_u_mpc_.transpose()*const_SQP_phi_mpc_*MPC_Stabilizer_u_mpc_ + const_SQP_pi_mpc_.transpose()*MPC_Stabilizer_u_mpc_ + const_SQP_ri_mpc_;
+        const_SQP_hi_mpc_ = const_SQP_pi_mpc_.transpose()*MPC_Stabilizer_u_mpc_ + const_SQP_ri_mpc_;
+
+        //const_A_mpc_.row(constraint_index) = (2*const_SQP_phi_mpc_*MPC_Stabilizer_u_mpc_ + const_SQP_pi_mpc_).transpose();
+        const_A_mpc_.row(constraint_index) = const_SQP_pi_mpc_.transpose();
+        const_ub_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+        const_lb_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+        constraint_index += 1;
+
+        const_SQP_phi_mpc_.setZero(input_num, input_num);
+        //const_SQP_pi_mpc_ = (b_IS_stab_mpc.transpose()*SUpy_stab_mpc_*SUp_stab_mpc_).transpose();
+        const_SQP_pi_mpc_ = SUpyp_stab_mpc_.transpose()*b_IS_stab_mpc;
+        const_SQP_ri_mpc_ = Const_b_eq.block(1, 0, 1, 1);
+        //const_SQP_hi_mpc_ = MPC_Stabilizer_u_mpc_.transpose()*const_SQP_phi_mpc_*MPC_Stabilizer_u_mpc_ + const_SQP_pi_mpc_.transpose()*MPC_Stabilizer_u_mpc_ + const_SQP_ri_mpc_;
+        const_SQP_hi_mpc_ = const_SQP_pi_mpc_.transpose()*MPC_Stabilizer_u_mpc_ + const_SQP_ri_mpc_;
+
+        //const_A_mpc_.row(constraint_index) = (2*const_SQP_phi_mpc_*MPC_Stabilizer_u_mpc_ + const_SQP_pi_mpc_).transpose();
+        const_A_mpc_.row(constraint_index) = const_SQP_pi_mpc_.transpose();
+        const_ub_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+        const_lb_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+        constraint_index += 1;
+
+        std::chrono::steady_clock::time_point t14 = std::chrono::steady_clock::now();
+        if(s == 0)
+        {
+            e_mpc_time_graph3 << std::chrono::duration_cast<std::chrono::microseconds>(t14 - t13).count()*1e-6 << ",";
+        }
+        
+        //alpha min max
+        const_A_mpc_.block (constraint_index, 0, step_time_adj_candidate_num_, input_num) = SUalp_stab_mpc_;
+        const_ub_mpc_.block(constraint_index, 0, step_time_adj_candidate_num_, 1)         = - SUalp_stab_mpc_*MPC_Stabilizer_u_mpc_ + MatrixXd::Ones(step_time_adj_candidate_num_, 1);
+        const_lb_mpc_.block(constraint_index, 0, step_time_adj_candidate_num_, 1)         = - SUalp_stab_mpc_*MPC_Stabilizer_u_mpc_ + MatrixXd::Zero(step_time_adj_candidate_num_, 1);
+        constraint_index += step_time_adj_candidate_num_;
+
+        //alpha sum
+        const_A_mpc_.block (constraint_index, 0, 1, input_num) = MatrixXd::Ones(1, step_time_adj_candidate_num_)*SUalp_stab_mpc_;
+        const_ub_mpc_.block(constraint_index, 0, 1, 1)         = - MatrixXd::Ones(1, step_time_adj_candidate_num_)*SUalp_stab_mpc_*MPC_Stabilizer_u_mpc_ + MatrixXd::Ones(1,1);
+        const_lb_mpc_.block(constraint_index, 0, 1, 1)         = - MatrixXd::Ones(1, step_time_adj_candidate_num_)*SUalp_stab_mpc_*MPC_Stabilizer_u_mpc_ + MatrixXd::Ones(1,1);
+        constraint_index += 1;
+
+        std::chrono::steady_clock::time_point t15 = std::chrono::steady_clock::now();
+        if(s == 0)
+        {
+            e_mpc_time_graph3 << std::chrono::duration_cast<std::chrono::microseconds>(t15 - t14).count()*1e-6 << ",";
+        }
+
+        double delf_x_max = 0.15, delf_x_min = -0.15;
+        double delf_y_max = 0.10, delf_y_min =  0.00;
+        //double delf_y_max = 10.10, delf_y_min =  0.00;
+
+        double delf_x_max_calc, delf_x_min_calc;
+        double delf_y_max_calc, delf_y_min_calc;
+
+        //delf min max
+        const_A_mpc_.block (constraint_index, 0, 1, input_num) = SUfx_stab_mpc_*SUf_stab_mpc_;
+        const_ub_mpc_.block(constraint_index, 0, 1, 1)         = - SUfx_stab_mpc_*SUf_stab_mpc_*MPC_Stabilizer_u_mpc_ + delf_x_max*MatrixXd::Ones(1,1);
+        const_lb_mpc_.block(constraint_index, 0, 1, 1)         = - SUfx_stab_mpc_*SUf_stab_mpc_*MPC_Stabilizer_u_mpc_ + delf_x_min*MatrixXd::Ones(1,1);
+        constraint_index += 1;
+
+        delf_y_max_calc = step_y_norm + (foot_step_(current_step_num_mpc_, 6)*delf_y_min + (1 - foot_step_(current_step_num_mpc_, 6))*delf_y_max);
+        delf_y_min_calc = step_y_norm - (foot_step_(current_step_num_mpc_, 6)*delf_y_max + (1 - foot_step_(current_step_num_mpc_, 6))*delf_y_min);
+
+        const_A_mpc_.block (constraint_index, 0, 1, input_num) = SUfy_stab_mpc_*SUf_stab_mpc_;
+        const_ub_mpc_.block(constraint_index, 0, 1, 1)         = - SUfy_stab_mpc_*SUf_stab_mpc_*MPC_Stabilizer_u_mpc_ + delf_y_max_calc*MatrixXd::Ones(1,1);
+        const_lb_mpc_.block(constraint_index, 0, 1, 1)         = - SUfy_stab_mpc_*SUf_stab_mpc_*MPC_Stabilizer_u_mpc_ + delf_y_min_calc*MatrixXd::Ones(1,1);
+        constraint_index += 1;
+
+        //alpha delf aux
+        for(int i = 0; i < step_time_adj_candidate_num_; i++)
+        {
+            const_SQP_phi_mpc_ = SUalp_stab_mpc_.row(i).transpose()*SUfx_stab_mpc_*SUf_stab_mpc_;
+            const_SQP_phi_mpc_calc_ = 0.5*(const_SQP_phi_mpc_ + const_SQP_phi_mpc_.transpose());
+            const_SQP_pi_mpc_  = (- SUaux_x_stab_mpc_.row(i)*SUaux_stab_mpc_).transpose();
+            const_SQP_ri_mpc_.setZero(1,1);
+            const_SQP_hi_mpc_ = MPC_Stabilizer_u_mpc_.transpose()*const_SQP_phi_mpc_calc_*MPC_Stabilizer_u_mpc_ + const_SQP_pi_mpc_.transpose()*MPC_Stabilizer_u_mpc_ + const_SQP_ri_mpc_;
+
+            const_A_mpc_.row(constraint_index) = (2*const_SQP_phi_mpc_calc_*MPC_Stabilizer_u_mpc_ + const_SQP_pi_mpc_).transpose();
+            const_ub_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+            const_lb_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+            constraint_index += 1;
+
+            const_SQP_phi_mpc_ = SUalp_stab_mpc_.row(i).transpose()*SUfy_stab_mpc_*SUf_stab_mpc_;
+            const_SQP_phi_mpc_calc_ = 0.5*(const_SQP_phi_mpc_ + const_SQP_phi_mpc_.transpose());
+            const_SQP_pi_mpc_  = (- SUaux_y_stab_mpc_.row(i)*SUaux_stab_mpc_).transpose();
+            const_SQP_ri_mpc_.setZero(1,1);
+            const_SQP_hi_mpc_ = MPC_Stabilizer_u_mpc_.transpose()*const_SQP_phi_mpc_calc_*MPC_Stabilizer_u_mpc_ + const_SQP_pi_mpc_.transpose()*MPC_Stabilizer_u_mpc_ + const_SQP_ri_mpc_;
+
+            const_A_mpc_.row(constraint_index) = (2*const_SQP_phi_mpc_calc_*MPC_Stabilizer_u_mpc_ + const_SQP_pi_mpc_).transpose();
+            const_ub_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+            const_lb_mpc_.block(constraint_index, 0, 1, 1) = - const_SQP_hi_mpc_;
+            constraint_index += 1;
+        }
+
+        std::chrono::steady_clock::time_point t16 = std::chrono::steady_clock::now();
+        if(s == 0)
+        {
+            e_mpc_time_graph3 << std::chrono::duration_cast<std::chrono::microseconds>(t16 - t15).count()*1e-6 << ",";
+        }
+
+        QP_MPC_Stabilizer_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
+
+        bool qp_solved = QP_MPC_Stabilizer_.SolveQPoases(100, MPC_Stabilizer_SQP_du_mpc_);
+
+        if(qp_solved)
+        {
+            //if((walking_tick_mpc_ - int(MPC_synchro_hz_) - 20)%int(2*hz_) == 0)
+            if((((walking_tick_mpc_ - int(MPC_synchro_hz_) + 1)/int(MPC_synchro_hz_))%60) == 0) //30hz
+            { 
+                cout << "SQP Iter: " << s + 1 << endl;
+                cout << "IS LIPM DCM Stabilizer Stepping Solved" << endl;
+                if(s == sqp_iter - 1) { cout << endl; }
+            }
+
+            MPC_Stabilizer_u_mpc_ = MPC_Stabilizer_u_mpc_ + MPC_Stabilizer_SQP_du_mpc_;
+        }
+        else
+        {
+            //A failed solve leaves MPC_Stabilizer_SQP_du_mpc_ meaningless, so it must NOT be applied.
+            //MPC_Stabilizer_u_mpc_ is the warm start carried across ticks: one bad step poisons every later tick.
+            sqp_ok = false;
+
+            cout << "SQP Iter: " << s + 1 << endl;
+            cout << "IS LIPM DCM Stabilizer Stepping Not Solved" << endl;
+            cout << (walking_tick_mpc_ - int(MPC_synchro_hz_) + 1)/int(MPC_synchro_hz_) + 1 << endl;
+        }
+
+        std::chrono::steady_clock::time_point t17 = std::chrono::steady_clock::now();
+        if(s == 0)
+        {
+            e_mpc_time_graph3 << std::chrono::duration_cast<std::chrono::microseconds>(t17 - t16).count()*1e-6 << endl;
+        }
+
+        //Remaining iterations would relinearize around the same point and fail again, so stop here.
+        if(!sqp_ok) { break; }
+    }
+
+    //Readout: runs once per tick whether or not the SQP completed all of its iterations.
+    prev_state.row(0).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + Pcpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(0*N_stab_mpc, N_stab_mpc);
+    prev_state.row(1).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + Pcvu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(0*N_stab_mpc, N_stab_mpc);
+    prev_state.row(2).transpose() = Pvps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + Pvpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(0*N_stab_mpc, N_stab_mpc);
+
+    prev_state.row(3).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + Pcpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(1*N_stab_mpc, N_stab_mpc);
+    prev_state.row(4).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + Pcvu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(1*N_stab_mpc, N_stab_mpc);
+    prev_state.row(5).transpose() = Pvps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + Pvpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(1*N_stab_mpc, N_stab_mpc);
+
+    //LIPM: the VRP is the ZMP, so no lambda inversion is needed to recover it
+    prev_zmp.row(0) = prev_state.row(2);
+    prev_zmp.row(1) = prev_state.row(5);
+
+    zmp_bound.row(0) = zmp_max_y_mpc_.transpose().segment(0, N_stab_mpc);
+    zmp_bound.row(1) = zmp_min_y_mpc_.transpose().segment(0, N_stab_mpc);
+
+    MPC_Stabilizer_u_mpc_sep_(0) = MPC_Stabilizer_u_mpc_(0*N_stab_mpc);
+    MPC_Stabilizer_u_mpc_sep_(1) = MPC_Stabilizer_u_mpc_(1*N_stab_mpc);
+
+    if(sqp_ok)
+    {
+        MPC_Stabilizer_alpha_mpc_  = MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc, 1*step_time_adj_candidate_num_);
+
+        MPC_Stabilizer_delf_mpc_   = MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc + 1*step_time_adj_candidate_num_,     2);
+        MPC_Stabilizer_delf_mpc_x_ = MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc + 1*step_time_adj_candidate_num_ + 0, 1);
+        MPC_Stabilizer_delf_mpc_y_ = MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc + 1*step_time_adj_candidate_num_ + 1, 1);
+
+        MPC_Stabilizer_aux_mpc_    = MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc + 1*step_time_adj_candidate_num_ + 2,                                  2*step_time_adj_candidate_num_);
+        MPC_Stabilizer_aux_mpc_x_  = MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc + 1*step_time_adj_candidate_num_ + 2 + 0*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_);
+        MPC_Stabilizer_aux_mpc_y_  = MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc + 1*step_time_adj_candidate_num_ + 2 + 1*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_);
+    }
+    else
+    {
+        //Rebuild the solver so the next tick cold starts instead of hotstarting from a broken working set.
+        QP_MPC_Stabilizer_.InitializeProblemSize(input_num, const_num);
+
+        MPC_Stabilizer_alpha_mpc_.setZero();
+        MPC_Stabilizer_alpha_mpc_(0) = 1;
+
+        MPC_Stabilizer_delf_mpc_x_(0) = step_x_norm;
+        MPC_Stabilizer_delf_mpc_y_(0) = step_y_norm;
+        MPC_Stabilizer_delf_mpc_ << MPC_Stabilizer_delf_mpc_x_, MPC_Stabilizer_delf_mpc_y_;
+
+        MPC_Stabilizer_aux_mpc_x_ = MPC_Stabilizer_alpha_mpc_*MPC_Stabilizer_delf_mpc_x_;
+        MPC_Stabilizer_aux_mpc_y_ = MPC_Stabilizer_alpha_mpc_*MPC_Stabilizer_delf_mpc_y_;
+        MPC_Stabilizer_aux_mpc_ << MPC_Stabilizer_aux_mpc_x_, MPC_Stabilizer_aux_mpc_y_;
+    }
+
+    MPC_Stabilizer_state_mpc_.segment(0,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + B_mpc_*MPC_Stabilizer_u_mpc_(0*N_stab_mpc);
+    MPC_Stabilizer_state_mpc_.segment(3,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + B_mpc_*MPC_Stabilizer_u_mpc_(1*N_stab_mpc);
+
+    double calc_time_adj = 0.0;
+
+    for (int i = 0; i < step_time_adj_candidate_num_; i++)
+    {
+        if(abs(MPC_Stabilizer_alpha_mpc_(i)) < 5e-3)
+        {
+            MPC_Stabilizer_alpha_mpc_(i) = 0.0;
+        }
+        calc_time_adj += i*MPC_Stabilizer_alpha_mpc_(i);
+    }
+
+    MPC_Stabilizer_time_adj_tick_x_mpc_ = max(round(calc_time_adj + 0.1), 0.0);
+    MPC_Stabilizer_time_adj_tick_y_mpc_ = max(round(calc_time_adj + 0.1), 0.0);
+
+    double time_adj_tick_mpc = 0.0;
+    time_adj_tick_mpc = max(MPC_Stabilizer_time_adj_tick_x_mpc_, MPC_Stabilizer_time_adj_tick_y_mpc_);
+    time_adj_tick_mpc = min(time_adj_tick_mpc, double(step_time_adj_candidate_num_ - 1));
+    if(current_step_num_mpc_ != 0 && step_enable_bool_mpc_ == 0)
+    {   
+        t_total_mpc_ = t_total_const_ - time_adj_tick_mpc*hz_/thread3_hz_;
+    }
+
+    e_mpc_stabilizer_data << N_stab_mpc                          << "," << step_time_adj_candidate_num_        << "," << step_enable_bool_mpc_        << ","
+                          << dcm_measured_mpc_(0)                << "," << dcm_measured_mpc_(1)                << "," << dcm_measured_mpc_(2)         << ","
+                          << dcm_refx(0)                         << "," << dcm_refy(0)                         << "," << zc_mj_                       << ","
+                          << MPC_Stabilizer_state_mpc_(0)        << "," << MPC_Stabilizer_state_mpc_(3)        << "," << zc_mj_                       << ","
+                          << MPC_Stabilizer_state_mpc_(1)        << "," << MPC_Stabilizer_state_mpc_(4)        << "," << 0.0                          << ","
+
+                          << MPC_Stabilizer_state_mpc_(2)        << "," << MPC_Stabilizer_state_mpc_(5)        << "," << 0.0                          << ","
+                          << zmp_max_x_mpc_(0)                   << "," << zmp_max_y_mpc_(0)                   << "," << zmp_bound(0,0)               << ","
+                          << prev_zmp(0, 0)                      << "," << prev_zmp(1, 0)                      << "," << prev_lambda(0)               << ","
+                          << MPC_Stabilizer_delf_mpc_x_(0)       << "," << MPC_Stabilizer_delf_mpc_y_(0)       << "," << zmp_bound(1,0)               << ","
+                          << step_x_norm                         << "," << step_y_norm                         << "," << b_                           << ","
+
+                          << MPC_Stabilizer_time_adj_tick_x_mpc_ << "," << calc_time_adj                       << "," << time_adj_tick_mpc            << ","
+                          << com_measured_mpc_(0)                << "," << com_measured_mpc_(1)                << "," << com_measured_mpc_(2)         << ","
+                          << com_dot_measured_mpc_(0)            << "," << com_dot_measured_mpc_(1)            << "," << com_dot_measured_mpc_(2)     << ","
+                          << endl;
+
+    data_save_calc.setZero(2*N_stab_mpc);
+    data_save_calc << dcm_refx, dcm_refy;
+    e_tmp_graph8 << data_save_calc.transpose() << endl;
+    data_save_calc << prev_state.row(2).transpose(), prev_state.row(5).transpose();
+    e_tmp_graph9 << data_save_calc.transpose() << endl;
+    data_save_calc << prev_state.row(0).transpose() + b_*prev_state.row(1).transpose(), prev_state.row(3).transpose() + b_*prev_state.row(4).transpose();
+    e_tmp_graph10 << data_save_calc.transpose() << endl;
+    data_save_calc << zmp_max_x_mpc_.segment(0, N_stab_mpc), zmp_max_y_mpc_.segment(0, N_stab_mpc);
+    e_tmp_graph11 << data_save_calc.transpose() << endl;
+    data_save_calc << prev_zmp.row(0).transpose(), prev_zmp.row(1).transpose();
+    e_tmp_graph12 << data_save_calc.transpose() << endl;
+    data_save_calc.setZero(step_time_adj_candidate_num_);
+    data_save_calc << MPC_Stabilizer_alpha_mpc_;
+    e_tmp_graph13 << data_save_calc.transpose() << endl;
+    data_save_calc.setZero(2*step_time_adj_candidate_num_);
+    data_save_calc << MPC_Stabilizer_aux_mpc_x_, MPC_Stabilizer_aux_mpc_y_;
+    e_tmp_graph14 << data_save_calc.transpose() << endl;
+
+    step_enable_bool_mpc_ = (bool)(mpc_tick + MPC_synchro_hz_ < t_total_const_ - t_dsp2_const_ - step_enable_time_fwd_*hz_ - step_enable_fix_time_pre_*hz_);
 }
 
 void AvatarController::IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz)
@@ -10443,7 +11160,7 @@ void AvatarController::IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, d
     e_tmp_graph7 << data_save_calc.transpose() << endl;
 }
 
-void AvatarController::IS_FIPM_3D_DCM_Stabililzer_MPC(double mpc_freq, double preview_window)
+void AvatarController::IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double preview_window)
 {
     double Q_dcm_x, Q_dcm_y, Q_dcm_z, R_dcm_x, R_dcm_y, R_dcm_z, R_dalp, R_df_x, R_df_y;
 
@@ -10764,7 +11481,7 @@ void AvatarController::IS_FIPM_3D_DCM_Stabililzer_MPC(double mpc_freq, double pr
                 next_step_prev_bool       = (bool)(mpc_tick + MPC_synchro_hz_*(i + 1) > ((1 - (bool)(current_step_num_mpc_))*t_temp_ + (j + 1)*t_total_mpc_ - t_dsp2_const_));
             }
 
-            if((walking_tick_mpc_ > t_temp_ - (t_dsp2_const_ + step_enable_fix_time_pre_*hz_)) && (next_step_start_prev_tick < N_stab_mpc) && (!param_stepping_stone_))
+            if((walking_tick_mpc_ > t_temp_ - (t_dsp2_const_ + step_enable_fix_time_pre_*hz_)) && (next_step_start_prev_tick < N_stab_mpc))
             {
                 Sf1_stab_mpc_(i,0) = step_enable_bool_mpc_* next_step_prev_bool*(zmp_max_y_mpc_(i) - zmp_max_y_mpc_(int(t_dsp1_const_/MPC_synchro_hz_)))/(MPC_Stabilizer_delf_mpc_y_(0));
                 if(walking_tick_mpc_ < t_temp_)
@@ -10823,6 +11540,8 @@ e_tmp_graph24 << data_save_calc.transpose() << endl;
 
     Eigen::MatrixXd prev_state;    prev_state.setZero(9,N_stab_mpc);
     Eigen::MatrixXd prev_zmp;      prev_zmp.setZero(2, N_stab_mpc);
+    Eigen::VectorXd prev_lambda;   prev_lambda.setZero(N_stab_mpc);
+    Eigen::MatrixXd vrp_bound;     vrp_bound.setZero(2, N_stab_mpc);
 
     std::vector<Eigen::MatrixXd> IS_FIPM_SQP_x_phi_max_vec; std::vector<Eigen::MatrixXd> IS_FIPM_SQP_x_phi_min_vec;
     std::vector<Eigen::MatrixXd> IS_FIPM_SQP_y_phi_max_vec; std::vector<Eigen::MatrixXd> IS_FIPM_SQP_y_phi_min_vec;
@@ -10830,6 +11549,8 @@ e_tmp_graph24 << data_save_calc.transpose() << endl;
     std::vector<Eigen::MatrixXd> IS_FIPM_SQP_y_pi_max_vec;  std::vector<Eigen::MatrixXd> IS_FIPM_SQP_y_pi_min_vec;
     std::vector<Eigen::MatrixXd> IS_FIPM_SQP_x_ri_max_vec;  std::vector<Eigen::MatrixXd> IS_FIPM_SQP_x_ri_min_vec;
     std::vector<Eigen::MatrixXd> IS_FIPM_SQP_y_ri_max_vec;  std::vector<Eigen::MatrixXd> IS_FIPM_SQP_y_ri_min_vec;
+
+    bool sqp_ok = true;
 
     for(int s = 0; s < sqp_iter; s++)
     {
@@ -11167,7 +11888,9 @@ e_tmp_graph24 << data_save_calc.transpose() << endl;
 
         QP_MPC_Stabilizer_.UpdateSubjectToAx(const_A_mpc_, const_lb_mpc_, const_ub_mpc_);
 
-        if(QP_MPC_Stabilizer_.SolveQPoases(100, MPC_Stabilizer_SQP_du_mpc_))
+        bool qp_solved = QP_MPC_Stabilizer_.SolveQPoases(100, MPC_Stabilizer_SQP_du_mpc_);
+
+        if(qp_solved)
         {
             //if((walking_tick_mpc_ - int(MPC_synchro_hz_) - 20)%int(2*hz_) == 0)
             if((((walking_tick_mpc_ - int(MPC_synchro_hz_) + 1)/int(MPC_synchro_hz_))%60) == 0) //30hz
@@ -11178,95 +11901,16 @@ e_tmp_graph24 << data_save_calc.transpose() << endl;
             }
 
             MPC_Stabilizer_u_mpc_ = MPC_Stabilizer_u_mpc_ + MPC_Stabilizer_SQP_du_mpc_;
-
-            if(s == sqp_iter - 1)
-            {
-                prev_state.row(0).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + Pcpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(0*N_stab_mpc, N_stab_mpc);
-                prev_state.row(1).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + Pcvu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(0*N_stab_mpc, N_stab_mpc);
-                prev_state.row(2).transpose() = Pvps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + Pvpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(0*N_stab_mpc, N_stab_mpc);
-
-                prev_state.row(3).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + Pcpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(1*N_stab_mpc, N_stab_mpc);
-                prev_state.row(4).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + Pcvu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(1*N_stab_mpc, N_stab_mpc);
-                prev_state.row(5).transpose() = Pvps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + Pvpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(1*N_stab_mpc, N_stab_mpc);
-
-                prev_state.row(6).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(6,3) + Pcpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc, N_stab_mpc);
-                prev_state.row(7).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(6,3) + Pcvu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc, N_stab_mpc);
-                prev_state.row(8).transpose() = Pvps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(6,3) + Pvpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc, N_stab_mpc);
-
-                Eigen::VectorXd lambda_bb_mat, lambda_bb_mat_calc;
-                lambda_bb_mat_calc = (prev_state.row(8) - GRAVITY*b_*b_*MatrixXd::Ones(1, N_stab_mpc)).array()/prev_state.row(6).array();
-                lambda_bb_mat      = MatrixXd::Ones(N_stab_mpc, 1) - lambda_bb_mat_calc;
-
-                prev_zmp.row(0)    = (prev_state.row(2).array() - (MatrixXd::Ones(1, N_stab_mpc) - lambda_bb_mat.transpose()).array()*prev_state.row(0).array()).array()/lambda_bb_mat.transpose().array();
-                prev_zmp.row(1)    = (prev_state.row(5).array() - (MatrixXd::Ones(1, N_stab_mpc) - lambda_bb_mat.transpose()).array()*prev_state.row(3).array()).array()/lambda_bb_mat.transpose().array();
-
-                MPC_Stabilizer_u_mpc_sep_(0) = MPC_Stabilizer_u_mpc_(0*N_stab_mpc);
-                MPC_Stabilizer_u_mpc_sep_(1) = MPC_Stabilizer_u_mpc_(1*N_stab_mpc);
-                MPC_Stabilizer_u_mpc_sep_(2) = MPC_Stabilizer_u_mpc_(2*N_stab_mpc);
-
-                MPC_Stabilizer_alpha_mpc_  = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc, 1*step_time_adj_candidate_num_);
-
-                MPC_Stabilizer_delf_mpc_   = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc + 1*step_time_adj_candidate_num_,     2);
-                MPC_Stabilizer_delf_mpc_x_ = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc + 1*step_time_adj_candidate_num_ + 0, 1);
-                MPC_Stabilizer_delf_mpc_y_ = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc + 1*step_time_adj_candidate_num_ + 1, 1);
-
-                MPC_Stabilizer_aux_mpc_    = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc + 1*step_time_adj_candidate_num_ + 2,                                  2*step_time_adj_candidate_num_);
-                MPC_Stabilizer_aux_mpc_x_  = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc + 1*step_time_adj_candidate_num_ + 2 + 0*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_);
-                MPC_Stabilizer_aux_mpc_y_  = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc + 1*step_time_adj_candidate_num_ + 2 + 1*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_);
-
-                MPC_Stabilizer_state_mpc_.segment(0,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + B_mpc_*MPC_Stabilizer_u_mpc_(0*N_stab_mpc);
-                MPC_Stabilizer_state_mpc_.segment(3,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + B_mpc_*MPC_Stabilizer_u_mpc_(1*N_stab_mpc);
-                MPC_Stabilizer_state_mpc_.segment(6,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(6,3) + B_mpc_*MPC_Stabilizer_u_mpc_(2*N_stab_mpc);
-            }
         }
         else
         {
+            //A failed solve leaves MPC_Stabilizer_SQP_du_mpc_ meaningless, so it must NOT be applied.
+            //MPC_Stabilizer_u_mpc_ is the warm start carried across ticks: one bad step poisons every later tick.
+            sqp_ok = false;
+
             cout << "SQP Iter: " << s + 1 << endl;
             cout << "IS FIPM DCM Stabilizer Stepping Not Solved" << endl;
             cout << (walking_tick_mpc_ - int(MPC_synchro_hz_) + 1)/int(MPC_synchro_hz_) + 1 << endl;
-
-            MPC_Stabilizer_u_mpc_ = MPC_Stabilizer_u_mpc_ + MPC_Stabilizer_SQP_du_mpc_;
-
-            if(s == sqp_iter - 1)
-            {
-                prev_state.row(0).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + Pcpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(0*N_stab_mpc, N_stab_mpc);
-                prev_state.row(1).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + Pcvu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(0*N_stab_mpc, N_stab_mpc);
-                prev_state.row(2).transpose() = Pvps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + Pvpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(0*N_stab_mpc, N_stab_mpc);
-
-                prev_state.row(3).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + Pcpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(1*N_stab_mpc, N_stab_mpc);
-                prev_state.row(4).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + Pcvu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(1*N_stab_mpc, N_stab_mpc);
-                prev_state.row(5).transpose() = Pvps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + Pvpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(1*N_stab_mpc, N_stab_mpc);
-
-                prev_state.row(6).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(6,3) + Pcpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc, N_stab_mpc);
-                prev_state.row(7).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(6,3) + Pcvu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc, N_stab_mpc);
-                prev_state.row(8).transpose() = Pvps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(6,3) + Pvpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc, N_stab_mpc);
-
-                Eigen::VectorXd lambda_bb_mat, lambda_bb_mat_calc;
-                lambda_bb_mat_calc = (prev_state.row(8) - GRAVITY*b_*b_*MatrixXd::Ones(1, N_stab_mpc)).array()/prev_state.row(6).array();
-                lambda_bb_mat      = MatrixXd::Ones(N_stab_mpc, 1) - lambda_bb_mat_calc;
-
-                prev_zmp.row(0)    = (prev_state.row(2).array() - (MatrixXd::Ones(1, N_stab_mpc) - lambda_bb_mat.transpose()).array()*prev_state.row(0).array()).array()/lambda_bb_mat.transpose().array();
-                prev_zmp.row(1)    = (prev_state.row(5).array() - (MatrixXd::Ones(1, N_stab_mpc) - lambda_bb_mat.transpose()).array()*prev_state.row(3).array()).array()/lambda_bb_mat.transpose().array();
-
-                MPC_Stabilizer_u_mpc_sep_(0) = MPC_Stabilizer_u_mpc_(0*N_stab_mpc);
-                MPC_Stabilizer_u_mpc_sep_(1) = MPC_Stabilizer_u_mpc_(1*N_stab_mpc);
-                MPC_Stabilizer_u_mpc_sep_(2) = MPC_Stabilizer_u_mpc_(2*N_stab_mpc);
-
-                MPC_Stabilizer_alpha_mpc_.setZero();
-                MPC_Stabilizer_alpha_mpc_(0) = 1;
-
-                MPC_Stabilizer_delf_mpc_x_(0) = step_x_norm;
-                MPC_Stabilizer_delf_mpc_y_(0) = step_y_norm;
-                MPC_Stabilizer_delf_mpc_ << MPC_Stabilizer_delf_mpc_x_, MPC_Stabilizer_delf_mpc_y_;
-
-                MPC_Stabilizer_aux_mpc_x_ = MPC_Stabilizer_alpha_mpc_*MPC_Stabilizer_delf_mpc_x_;
-                MPC_Stabilizer_aux_mpc_y_ = MPC_Stabilizer_alpha_mpc_*MPC_Stabilizer_delf_mpc_y_;
-                MPC_Stabilizer_aux_mpc_ << MPC_Stabilizer_aux_mpc_x_, MPC_Stabilizer_aux_mpc_y_;
-
-                MPC_Stabilizer_state_mpc_.segment(0,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + B_mpc_*MPC_Stabilizer_u_mpc_(0*N_stab_mpc);
-                MPC_Stabilizer_state_mpc_.segment(3,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + B_mpc_*MPC_Stabilizer_u_mpc_(1*N_stab_mpc);
-                MPC_Stabilizer_state_mpc_.segment(6,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(6,3) + B_mpc_*MPC_Stabilizer_u_mpc_(2*N_stab_mpc);
-            }
         }
 
         std::chrono::steady_clock::time_point t17 = std::chrono::steady_clock::now();
@@ -11274,7 +11918,73 @@ e_tmp_graph24 << data_save_calc.transpose() << endl;
         {
             e_mpc_time_graph3 << std::chrono::duration_cast<std::chrono::microseconds>(t17 - t16).count()*1e-6 << endl;
         }
+
+        //Remaining iterations would relinearize around the same point and fail again, so stop here.
+        if(!sqp_ok) { break; }
     }
+
+    //Readout: runs once per tick whether or not the SQP completed all of its iterations.
+    prev_state.row(0).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + Pcpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(0*N_stab_mpc, N_stab_mpc);
+    prev_state.row(1).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + Pcvu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(0*N_stab_mpc, N_stab_mpc);
+    prev_state.row(2).transpose() = Pvps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + Pvpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(0*N_stab_mpc, N_stab_mpc);
+
+    prev_state.row(3).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + Pcpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(1*N_stab_mpc, N_stab_mpc);
+    prev_state.row(4).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + Pcvu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(1*N_stab_mpc, N_stab_mpc);
+    prev_state.row(5).transpose() = Pvps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + Pvpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(1*N_stab_mpc, N_stab_mpc);
+
+    prev_state.row(6).transpose() = Pcps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(6,3) + Pcpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc, N_stab_mpc);
+    prev_state.row(7).transpose() = Pcvs_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(6,3) + Pcvu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc, N_stab_mpc);
+    prev_state.row(8).transpose() = Pvps_stab_mpc_*MPC_Stabilizer_state_mpc_.segment(6,3) + Pvpu_stab_mpc_*MPC_Stabilizer_u_mpc_.segment(2*N_stab_mpc, N_stab_mpc);
+
+    {
+        Eigen::VectorXd lambda_bb_mat, lambda_bb_mat_calc;
+        lambda_bb_mat_calc = (prev_state.row(8) - GRAVITY*b_*b_*MatrixXd::Ones(1, N_stab_mpc)).array()/prev_state.row(6).array();
+        lambda_bb_mat      = MatrixXd::Ones(N_stab_mpc, 1) - lambda_bb_mat_calc;
+        prev_lambda        = lambda_bb_mat*(1/(b_*b_));
+
+        prev_zmp.row(0)    = (prev_state.row(2).array() - (MatrixXd::Ones(1, N_stab_mpc) - lambda_bb_mat.transpose()).array()*prev_state.row(0).array()).array()/lambda_bb_mat.transpose().array();
+        prev_zmp.row(1)    = (prev_state.row(5).array() - (MatrixXd::Ones(1, N_stab_mpc) - lambda_bb_mat.transpose()).array()*prev_state.row(3).array()).array()/lambda_bb_mat.transpose().array();
+
+        vrp_bound.row(0) = zmp_max_y_mpc_.transpose().array()*lambda_bb_mat.transpose().array() + (MatrixXd::Ones(1, N_stab_mpc) - lambda_bb_mat.transpose()).array()*prev_state.row(3).array();
+        vrp_bound.row(1) = zmp_min_y_mpc_.transpose().array()*lambda_bb_mat.transpose().array() + (MatrixXd::Ones(1, N_stab_mpc) - lambda_bb_mat.transpose()).array()*prev_state.row(3).array();
+    }
+
+    MPC_Stabilizer_u_mpc_sep_(0) = MPC_Stabilizer_u_mpc_(0*N_stab_mpc);
+    MPC_Stabilizer_u_mpc_sep_(1) = MPC_Stabilizer_u_mpc_(1*N_stab_mpc);
+    MPC_Stabilizer_u_mpc_sep_(2) = MPC_Stabilizer_u_mpc_(2*N_stab_mpc);
+
+    if(sqp_ok)
+    {
+        MPC_Stabilizer_alpha_mpc_  = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc, 1*step_time_adj_candidate_num_);
+
+        MPC_Stabilizer_delf_mpc_   = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc + 1*step_time_adj_candidate_num_,     2);
+        MPC_Stabilizer_delf_mpc_x_ = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc + 1*step_time_adj_candidate_num_ + 0, 1);
+        MPC_Stabilizer_delf_mpc_y_ = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc + 1*step_time_adj_candidate_num_ + 1, 1);
+
+        MPC_Stabilizer_aux_mpc_    = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc + 1*step_time_adj_candidate_num_ + 2,                                  2*step_time_adj_candidate_num_);
+        MPC_Stabilizer_aux_mpc_x_  = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc + 1*step_time_adj_candidate_num_ + 2 + 0*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_);
+        MPC_Stabilizer_aux_mpc_y_  = MPC_Stabilizer_u_mpc_.segment(3*N_stab_mpc + 1*step_time_adj_candidate_num_ + 2 + 1*step_time_adj_candidate_num_, 1*step_time_adj_candidate_num_);
+    }
+    else
+    {
+        //Rebuild the solver so the next tick cold starts instead of hotstarting from a broken working set.
+        QP_MPC_Stabilizer_.InitializeProblemSize(input_num, const_num);
+
+        MPC_Stabilizer_alpha_mpc_.setZero();
+        MPC_Stabilizer_alpha_mpc_(0) = 1;
+
+        MPC_Stabilizer_delf_mpc_x_(0) = step_x_norm;
+        MPC_Stabilizer_delf_mpc_y_(0) = step_y_norm;
+        MPC_Stabilizer_delf_mpc_ << MPC_Stabilizer_delf_mpc_x_, MPC_Stabilizer_delf_mpc_y_;
+
+        MPC_Stabilizer_aux_mpc_x_ = MPC_Stabilizer_alpha_mpc_*MPC_Stabilizer_delf_mpc_x_;
+        MPC_Stabilizer_aux_mpc_y_ = MPC_Stabilizer_alpha_mpc_*MPC_Stabilizer_delf_mpc_y_;
+        MPC_Stabilizer_aux_mpc_ << MPC_Stabilizer_aux_mpc_x_, MPC_Stabilizer_aux_mpc_y_;
+    }
+
+    MPC_Stabilizer_state_mpc_.segment(0,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(0,3) + B_mpc_*MPC_Stabilizer_u_mpc_(0*N_stab_mpc);
+    MPC_Stabilizer_state_mpc_.segment(3,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(3,3) + B_mpc_*MPC_Stabilizer_u_mpc_(1*N_stab_mpc);
+    MPC_Stabilizer_state_mpc_.segment(6,3) = A_mpc_*MPC_Stabilizer_state_mpc_.segment(6,3) + B_mpc_*MPC_Stabilizer_u_mpc_(2*N_stab_mpc);
 
     double calc_time_adj = 0.0;
 
@@ -11303,11 +12013,13 @@ e_tmp_graph24 << data_save_calc.transpose() << endl;
                           << dcm_refx(0)                         << "," << dcm_refy(0)                         << "," << dcm_refz(0)                  << ","
                           << MPC_Stabilizer_state_mpc_(0)        << "," << MPC_Stabilizer_state_mpc_(3)        << "," << MPC_Stabilizer_state_mpc_(6) << ","
                           << MPC_Stabilizer_state_mpc_(1)        << "," << MPC_Stabilizer_state_mpc_(4)        << "," << MPC_Stabilizer_state_mpc_(7) << ","
+
                           << MPC_Stabilizer_state_mpc_(2)        << "," << MPC_Stabilizer_state_mpc_(5)        << "," << MPC_Stabilizer_state_mpc_(8) << ","
-                          << zmp_max_x_mpc_(0)                   << "," << zmp_max_y_mpc_(0)                   << "," << 0                            << ","
-                          << prev_zmp(0, 0)                      << "," << prev_zmp(1, 0)                      << "," << 0                            << ","
-                          << MPC_Stabilizer_delf_mpc_x_(0)       << "," << MPC_Stabilizer_delf_mpc_y_(0)       << "," << 0                            << ","
+                          << zmp_max_x_mpc_(0)                   << "," << zmp_max_y_mpc_(0)                   << "," << vrp_bound(0,0)               << ","
+                          << prev_zmp(0, 0)                      << "," << prev_zmp(1, 0)                      << "," << prev_lambda(0)               << ","
+                          << MPC_Stabilizer_delf_mpc_x_(0)       << "," << MPC_Stabilizer_delf_mpc_y_(0)       << "," << vrp_bound(1,0)               << ","
                           << step_x_norm                         << "," << step_y_norm                         << "," << b_                           << ","
+
                           << MPC_Stabilizer_time_adj_tick_x_mpc_ << "," << calc_time_adj                       << "," << time_adj_tick_mpc            << ","
                           << com_measured_mpc_(0)                << "," << com_measured_mpc_(1)                << "," << com_measured_mpc_(2)         << ","
                           << com_dot_measured_mpc_(0)            << "," << com_dot_measured_mpc_(1)            << "," << com_dot_measured_mpc_(2)     << ","
@@ -11677,10 +12389,7 @@ void AvatarController::GravityCalculate_MJ()
 
 void AvatarController::parameterSetting()
 {       
-    target_x_ = 0.00;
-    if(scenario_num_ == 0 && param_loco_manipulation_ == 1)
-    { target_x_ = 0.00; }
-    //{ target_x_ = 0.75; }
+    target_x_ = 0.0;
     target_y_ = 0.0;
     if(scenario_num_ == 1)
     { target_y_ = 0.00; }
@@ -11698,26 +12407,6 @@ void AvatarController::parameterSetting()
     t_dsp2_const_  = 0.10 * hz_;
     t_total_const_ = 0.8 * hz_;
 
-    if(param_loco_manipulation_ && scenario_num_ == 0)
-    {
-        t_dsp1_        = 0.15 * hz_;
-        t_dsp2_        = 0.15 * hz_;
-        t_total_       = 1.0 * hz_;
-        t_dsp1_const_  = 0.15 * hz_;
-        t_dsp2_const_  = 0.15 * hz_;
-        t_total_const_ = 1.0 * hz_;
-    }
-
-    if(param_stepping_stone_)
-    {
-        t_dsp1_        = 0.25 * hz_;
-        t_dsp2_        = 0.25 * hz_;
-        t_total_       = 1.5 * hz_;
-        t_dsp1_const_  = 0.25 * hz_;
-        t_dsp2_const_  = 0.25 * hz_;
-        t_total_const_ = 1.5 * hz_;
-    }
-
     t_ssp_ = t_total_ - t_dsp1_ - t_dsp2_;
     //foot_width_  = zmp_y_max;
     foot_width_  = zmp_y_max_foot_width_;
@@ -11732,8 +12421,7 @@ void AvatarController::parameterSetting()
     current_step_num_ = 0;
     pelv_height_offset_ = 0.0; // change pelvis height for manipulation when the robot stop walking
 
-    //scenario_end_num_ = 0 + 2*(bool)(param_loco_manipulation_);
-    scenario_end_num_ = 0 + 0*(bool)(param_loco_manipulation_);
+    scenario_end_num_ = 0;
     if(scenario_num_ == 0)
     {
         cout << "scenario num: " << scenario_num_ << endl;
@@ -11755,26 +12443,11 @@ void AvatarController::updateNextStepTime()
 
     if (current_step_num_ == total_step_num_ - 1 && walking_tick_ >= t_last_ + t_total_)
     {
-        //walking_enable_ = false;
-        //if((scenario_num_ < scenario_end_num_ - 1) && (param_loco_manipulation_ == 1))
-        //{
-        //    scenario_num_ ++;
-        //    walking_tick_ = 0;
-        //    current_step_num_ = 0;
-        //    aa = 0;
-        //}
+
     }
     else
     {
         walking_tick_++;
-        if((walking_tick_ < t_temp_ - 0.2*hz_ && param_loco_manipulation_ == 1))
-        {
-            //if(abs(pow(dcm_desired_(0) - dcm_measured_(0), 2) + pow(dcm_desired_(1) - dcm_measured_(1), 2)) > 0.005)
-            //{
-            //    walking_tick_  = t_temp_ - 0.2*hz_;
-            //    total_step_num_ = 3;
-            //}
-        }
     }
 }
 
@@ -11934,15 +12607,13 @@ void AvatarController::CP_compen_MJ_FT()
     double RP_Kp_mj_ft = 0.03;
     double RP_Kd_mj_ft = 0.0005;
     double RP_Ki_mj_ft = 10.0;
-    double RP_F_T_x_minmaxcut_mj_ft = 20;// - 15*param_loco_manipulation_;
-    double RP_F_T_y_minmaxcut_mj_ft = 20;// - 15*param_loco_manipulation_;
+    double RP_F_T_x_minmaxcut_mj_ft = 20;
+    double RP_F_T_y_minmaxcut_mj_ft = 20;
     
     if(param_sim_mode_)
     {
         RP_Kp_mj_ft = 00.04;
         RP_Kd_mj_ft = 00.00;
-        //RP_Ki_mj_ft = 40.00 - 30.00*param_loco_manipulation_;
-        //RP_F_T_minmaxcut_mj_ft = 20 - 10*param_loco_manipulation_;
 
         RP_Ki_mj_ft = 10.00;
         RP_F_T_x_minmaxcut_mj_ft = 10;

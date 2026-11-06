@@ -30,8 +30,6 @@
 
 const std::string calibration_folder_dir_ = "/home/dyros/data/vive_tracker/calibration_log/dh";  //tocabi 
 
-double thread3_hz_ = 0.0;
-
 class AvatarController
 {
 public:
@@ -42,6 +40,8 @@ public:
     std::ifstream calibration_log_file_ifstream_[4];
 
     //void taskCommandToCC(TaskCommand tc_);
+
+    double thread3_hz_ = 0.0;
 
     void computeSlow();
     void computeFast();
@@ -1410,9 +1410,8 @@ public:
     int    param_ext_force_step_;
     double param_ext_force_;
     double param_ext_theta_;
+    bool   param_IS_FIPM_;
     int    param_scenario_;
-    bool   param_stepping_stone_;
-    bool   param_loco_manipulation_;
     bool   param_disturbance_walking_;
 
     double zmp_x_max = 0.15;
@@ -1432,10 +1431,9 @@ public:
 
     //IS MPC QCQP
     void IS_LIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
-    void IS_LIPM_CoM_sep_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
     void IS_FIPM_CoM_Planner_MPC(double mpc_freq, double mpc_dt, double mpc_preview_window, int mpc_synchro_hz);
     void IS_LIPM_DCM_Stabilizer_MPC(double mpc_freq, double preview_window);
-    void IS_FIPM_3D_DCM_Stabililzer_MPC(double mpc_freq, double preview_window);
+    void IS_FIPM_3D_DCM_Stabilizer_MPC(double mpc_freq, double preview_window);
     void econom2_thread_stepchange();
 
     //Matrix
@@ -1630,6 +1628,12 @@ public:
     Eigen::MatrixXd ssz_stab_mpc_;
     Eigen::MatrixXd Sf1_stab_mpc_;
     Eigen::MatrixXd Sf2_stab_mpc_;
+
+    //LIPM stabilizer: ZMP(=VRP) constraint is linear, so the input/state parts are cached once
+    Eigen::MatrixXd Azmpx_stab_mpc_;  //Pvpu*SUpxp            (N_stab_mpc x input_num)
+    Eigen::MatrixXd Azmpy_stab_mpc_;  //Pvpu*SUpyp            (N_stab_mpc x input_num)
+    Eigen::MatrixXd Pvpsx_stab_mpc_;  //Pvps*ssx              (N_stab_mpc x 3*N_state)
+    Eigen::MatrixXd Pvpsy_stab_mpc_;  //Pvps*ssy              (N_stab_mpc x 3*N_state)
 
     Eigen::VectorXd MPC_Stabilizer_state_container_from_mpc_;
     Eigen::VectorXd MPC_Stabilizer_state_main_;
